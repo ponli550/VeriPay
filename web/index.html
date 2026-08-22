@@ -252,6 +252,25 @@ async function openSharedBoard(){
   return true;
 }
 addEventListener("DOMContentLoaded",()=>{openSharedBoard();});
+// ── Viewer-mode probe: static hosts serve this page with no engine.
+// GET /api/analyze answers 405 from the real engine and 404 from a
+// static host — probe, don't assume.
+let viewerMode=false;
+(async()=>{
+  try{
+    const r=await fetch("/api/analyze",{method:"GET"});
+    viewerMode=(r.status!==405);
+  }catch(e){viewerMode=true;}
+  if(viewerMode){
+    const ex=$("exec");if(ex){ex.disabled=true;ex.textContent="VIEWER MODE — ENGINE NOT ON THIS HOST";}
+    const wg=document.getElementById("wgo");if(wg){wg.disabled=true;}
+    log("system","ok","VIEWER MODE — this public deployment renders shared boards only; the engine and your documents stay on the analyst's machine");
+    if(!location.hash.includes("board=")){
+      $("canvas").innerHTML=`<div class="idle"><div class="big">VIEWER MODE</div><p>This deployment renders shared boards only — open a #board link, or run the engine locally: uv run python server.py</p></div>`;
+    }
+  }
+})();
+
 
 $("drop").onclick=()=>$("file").click();
 $("drop").ondragover=e=>e.preventDefault();
