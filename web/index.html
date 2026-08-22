@@ -253,7 +253,7 @@ async function phPay(){
   const out=$("phpayout");
   out.textContent="building gated transaction…";
   const r=await fetch("/api/build_payment",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({payer:phWallet,root:lastResult.audit_log_root,lamports:1000})});
+    body:JSON.stringify({payer:phWallet,root:lastResult.audit_log_root,lamports:1000000})});
   if(!r.ok){out.textContent=`refused: ${await r.text()}`;return;}
   const j=await r.json();
   try{
@@ -809,7 +809,7 @@ async function phPay(){
   const out=$("phpayout");
   out.textContent="building gated transaction…";
   const r=await fetch("/api/build_payment",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({payer:phWallet,root:lastResult.audit_log_root,lamports:1000})});
+    body:JSON.stringify({payer:phWallet,root:lastResult.audit_log_root,lamports:1000000})});
   if(!r.ok){out.textContent=`refused: ${await r.text()}`;return;}
   const j=await r.json();
   try{
