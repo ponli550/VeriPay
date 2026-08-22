@@ -1595,6 +1595,19 @@ _h47 = open(os.path.join(os.path.dirname(__file__), "web",
 check("UI states the rate limit plainly", "rate-limited" in _h47
       and "partial" in _h47)
 
+
+# ── 48. mobile layout — spec BEFORE code ──────────────────────────────────
+
+print("\n=== 48. mobile ===")
+_hm = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+_mob = _hm[_hm.index("@media (max-width:860px)"):]
+_mob = _mob[:_mob.index("}")+2]
+check("canvas is never hidden on phones", ".right{display:none}" not in _mob.replace(" ",""))
+check("phone layout stacks to one column",
+      "grid-template-columns:1fr" in _mob.replace(" ","") and "overflow:auto" in _mob.replace(" ",""))
+check("dashboard tiles collapse to a single column on phones",
+      ".dash{grid-template-columns:1fr" in _mob.replace(" ",""))
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
