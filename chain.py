@@ -71,8 +71,11 @@ def load_keypair() -> Keypair:
 
 def result_digest(result: dict) -> str:
     """Canonical sha256 of a released result: sorted keys, no whitespace —
-    the same dict always hashes the same regardless of insertion order."""
-    blob = json.dumps(result, sort_keys=True, separators=(",", ":"))
+    the same dict always hashes the same regardless of insertion order.
+    audit_log_root is excluded: the log root travels as its own digest
+    in the memo, and folding it in would entangle the two."""
+    body = {k: v for k, v in result.items() if k != "audit_log_root"}
+    blob = json.dumps(body, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
@@ -97,10 +100,17 @@ def notarize(result: dict, keypair: Keypair | None = None, transport=None) -> di
     """Anchor sha256(result) on-chain. Returns signature, digest, explorer link."""
     kp = keypair or load_keypair()
     digest = result_digest(result)
-    sig = _send([_memo_ix(kp, f"veripay:sha256:{digest}")], kp, transport)
+    memo = f"veripay:sha256:{digest}"
+    root = result.get("audit_log_root")
+    if root:
+        # Process and outcome, both anchored: the audit-chain root makes
+        # the pipeline's own telemetry as provable as the result.
+        memo += f":log:{root}"
+    sig = _send([_memo_ix(kp, memo)], kp, transport)
     return {
         "signature": sig,
         "digest": digest,
+        "log_root": root or "",
         "explorer": f"https://explorer.solana.com/tx/{sig}?cluster=devnet",
     }
 
