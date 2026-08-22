@@ -1,0 +1,14 @@
+[project]
+name = "veripay"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "gradio>=6.25.0",
+    "httpx>=0.28.1",
+    "openai>=3.3.1",
+    "openpyxl>=3.1.5",
+    "pdfplumber>=0.11.10",
+    "python-dotenv>=1.2.3",
+    "reportlab>=5.0.1",
+]

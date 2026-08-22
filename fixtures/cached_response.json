@@ -1,0 +1,47 @@
+{
+  "answer": "Total revenue was stated as RM 2,750,000 across three segments. However, the individual segments sum to only RM 2,650,000 — a discrepancy of RM 100,000.",
+  "facts": [
+    {
+      "id": "f1",
+      "claim": "Product revenue",
+      "value": 1200000,
+      "page": "Page 1",
+      "quote": "Product revenue 1,200,000"
+    },
+    {
+      "id": "f2",
+      "claim": "Services revenue",
+      "value": 1150000,
+      "page": "Page 1",
+      "quote": "Services revenue 1,150,000"
+    },
+    {
+      "id": "f3",
+      "claim": "Licensing revenue",
+      "value": 300000,
+      "page": "Page 1",
+      "quote": "Licensing revenue 300,000"
+    },
+    {
+      "id": "f4",
+      "claim": "Total revenue (stated)",
+      "value": 2750000,
+      "page": "Page 1",
+      "quote": "Total revenue 2,750,000"
+    }
+  ],
+  "checks": [
+    {
+      "description": "Stated total vs sum of segments",
+      "operation": "sum",
+      "operand_fact_ids": [
+        "f1",
+        "f2",
+        "f3"
+      ],
+      "expected_value": 2750000,
+      "against_fact_id": "f4"
+    }
+  ],
+  "recommendation": "Reconcile the RM 100,000 gap between the stated total revenue (RM 2,750,000) and the sum of its segments (RM 2,650,000) before this report is signed off."
+}

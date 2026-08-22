@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FINVERIFY // AUDIT_ENGINE</title>
+<!-- Fonts are progressive enhancement: everything falls back to system stacks offline. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#131313; --bg-lowest:#0e0e0e; --bg-low:#1b1b1b; --bg-mid:#1f1f1f;
+  --ink:#e2e2e2; --ink-dim:#cec2d8; --ink-faint:#978da1;
+  --line:#4c4355;
+  --teal:#14F195; --purple:#9945FF; --orange:#FF4D00; --amber:#f59e0b;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Inter',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.caps{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.mono{font-family:var(--mono)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--line)}
+header{display:flex;justify-content:space-between;align-items:center;height:56px;padding:0 24px;background:var(--bg-lowest);border-bottom:1px solid var(--line);flex:none}
+header h1{font-size:18px;font-weight:700;letter-spacing:-.02em}
+header .glyph{color:var(--teal);font-family:var(--mono);font-weight:700;margin-right:10px}
+header .sub{color:var(--ink-faint);font-family:var(--mono);font-size:11px}
+main{flex:1;display:flex;min-height:0}
+/* left column */
+.left{width:380px;min-width:320px;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--bg)}
+.panel-head{padding:10px 16px;border-bottom:1px solid var(--line);background:var(--bg-lowest);display:flex;justify-content:space-between;align-items:center}
+.panel-head .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px rgba(20,241,149,.8);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.controls{padding:16px;border-bottom:1px solid var(--line);background:var(--bg-lowest)}
+.dropzone{border:1px dashed var(--teal);box-shadow:0 0 12px rgba(20,241,149,.12) inset;background:var(--bg-low);padding:18px;text-align:center;cursor:pointer;margin-bottom:10px;transition:border-color .1s}
+.dropzone:hover{border-color:var(--purple)}
+.dropzone .caps{color:var(--ink)}
+.dropzone .file{color:var(--teal);font-family:var(--mono);font-size:12px;margin-top:6px;word-break:break-all}
+.q{width:100%;background:var(--bg-low);border:1px solid var(--line);color:var(--ink);font-family:var(--mono);font-size:12px;padding:8px 10px;margin-bottom:10px}
+.q:focus{outline:1px solid var(--purple)}
+.exec{width:100%;padding:10px;border:none;background:linear-gradient(90deg,var(--purple),var(--teal));color:var(--bg-lowest);font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.1em;cursor:pointer}
+.exec:disabled{opacity:.4;cursor:not-allowed}
+.privacy{color:var(--ink-faint);font-size:11px;line-height:1.5;margin-top:10px}
+.privacy b{color:var(--ink-dim)}
+.telemetry{flex:1;overflow-y:auto;padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.65;color:var(--ink-dim)}
+.telemetry .t{color:var(--ink-faint)}
+.telemetry .ok{color:var(--teal)} .telemetry .fail{color:var(--orange)}
+.telemetry .st-parse{color:var(--teal)} .telemetry .st-redact{color:var(--orange)}
+.telemetry .st-extract{color:var(--purple)} .telemetry .st-verify-math,.telemetry .st-verify-citations{color:var(--teal)}
+.telemetry .ms{color:var(--ink-faint);float:right}
+.cursor{color:var(--teal);animation:pulse 1s infinite}
+/* right column */
+.right{flex:1;display:flex;flex-direction:column;min-width:0;background-image:linear-gradient(to right,rgba(151,141,161,.07) 1px,transparent 1px),linear-gradient(to bottom,rgba(151,141,161,.07) 1px,transparent 1px);background-size:32px 32px}
+.canvas-wrap{flex:1;overflow:auto;padding:24px;perspective:1400px}
+.idle{border:1px solid var(--purple);background:var(--bg-lowest);padding:36px;max-width:420px;margin:12vh auto;text-align:center}
+.idle .big{font-family:var(--mono);font-weight:700;letter-spacing:.06em}
+.idle p{color:var(--ink-faint);font-family:var(--mono);font-size:11px;margin-top:8px;line-height:1.6}
+.banner{border:1px solid var(--amber);background:rgba(245,158,11,.08);color:var(--amber);font-family:var(--mono);font-size:12px;font-weight:700;padding:10px 14px;margin-bottom:16px}
+.answer{border:1px solid var(--line);border-left:4px solid var(--purple);background:var(--bg-lowest);padding:16px;margin-bottom:16px}
+.answer .caps{color:var(--ink-faint);margin-bottom:8px;display:block}
+.answer .body{font-size:14px;line-height:1.6}
+.rec{border-left:4px solid var(--teal);background:rgba(20,241,149,.06);padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.55}
+.rec b{color:var(--teal)}
+.flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:8px 0 16px}
+.card{width:380px;flex:none;background:var(--bg-lowest);border:1px solid var(--line);display:flex;flex-direction:column;transition:transform .18s ease,box-shadow .18s ease;transform-style:preserve-3d}
+.card:hover{transform:rotateY(-4deg) translateZ(14px) translateY(-2px)}
+.card.ok{border-top:1px solid var(--teal);border-left:4px solid var(--teal);box-shadow:0 0 15px rgba(20,241,149,.14)}
+.card.bad{border-top:1px solid var(--orange);border-left:4px solid var(--orange);box-shadow:0 0 15px rgba(255,77,0,.12)}
+.card.warn{border-top:1px solid var(--amber);border-left:4px solid var(--amber)}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px;border-bottom:1px solid var(--line)}
+.card-head h3{font-size:15px;font-weight:600;line-height:1.35}
+.badge{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;padding:3px 8px;border:1px solid;white-space:nowrap}
+.badge.ok{color:var(--teal);border-color:rgba(20,241,149,.35);background:rgba(20,241,149,.08)}
+.badge.bad{color:var(--orange);border-color:rgba(255,77,0,.35);background:rgba(255,77,0,.08)}
+.badge.warn{color:var(--amber);border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08)}
+.card-body{padding:12px;display:flex;flex-direction:column;gap:12px}
+.eq{border:1px solid var(--line);background:#000;padding:10px}
+.eq .caps{color:var(--ink-faint);opacity:.7;display:block;margin-bottom:6px}
+.eq .expr{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--purple)}
+.eq .expr span{color:var(--teal)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line)}
+.grid2>div{padding:10px}
+.grid2>div:first-child{border-right:1px solid var(--line)}
+.grid2 .caps{color:var(--ink-faint);display:block;margin-bottom:4px}
+.grid2 .val{font-family:var(--mono);font-size:13px;font-weight:500}
+.variance{border:1px dashed rgba(255,77,0,.5);background:rgba(255,77,0,.05);color:var(--orange);font-family:var(--mono);font-size:12.5px;font-weight:700;padding:8px 10px}
+.variance::before{content:"⚠ "}
+.arrow{width:56px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--line);font-family:var(--mono);font-size:18px}
+.ghost{width:380px;flex:none;border:1px dashed rgba(76,67,85,.6);opacity:.45;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:260px;gap:8px}
+.sources{margin-top:8px}
+.sources h2{margin-bottom:10px}
+.src-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.src{border:1px solid var(--line);background:var(--bg-lowest);padding:12px}
+.src .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.src .claim{font-weight:600;font-size:13px}
+.src .val{font-family:var(--mono);color:var(--ink)}
+.src .page{font-family:var(--mono);font-size:10px;color:var(--ink-faint);border:1px solid var(--line);padding:1px 6px}
+.src blockquote{border-left:3px solid var(--line);margin-top:8px;padding-left:10px;color:var(--ink-faint);font-size:12px;font-style:italic}
+.src .flag{color:var(--amber);font-family:var(--mono);font-size:11px;margin-top:6px}
+.src .pin{color:var(--teal);font-family:var(--mono);font-size:11px;margin-top:6px}
+h2.caps{color:var(--ink-faint);font-size:11px}
+.section-gap{margin-bottom:16px}
+@media (prefers-reduced-motion: no-preference){
+  @keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+  @keyframes drawIn{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  .flow .card,.flow .ghost{animation:cardIn .5s cubic-bezier(.2,.8,.2,1) both}
+  .flow .arrow{transform-origin:left;animation:drawIn .3s ease both}
+  .src{animation:cardIn .4s ease both}
+}
+@media (max-width:860px){.left{width:100%;min-width:0}.right{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="glyph">▮▶</span>FINVERIFY <span class="sub">// AUDIT_ENGINE</span></h1>
+  <span class="sub">deterministic verification · PDPA-scrubbed · nothing renders unverified</span>
+</header>
+<main>
+  <div class="left">
+    <div class="controls">
+      <div class="caps" style="color:var(--ink-faint);margin-bottom:10px">Deterministic Pipeline Controls</div>
+      <div class="dropzone" id="drop">
+        <span class="caps">DROP PDF/XLSX HERE</span>
+        <div class="file" id="fname">no file staged</div>
+        <input type="file" id="file" accept=".pdf,.xlsx" hidden>
+      </div>
+      <input class="q" id="q" value="What was total revenue, and does it add up?">
+      <button class="exec" id="exec" disabled>▶ EXECUTE PIPELINE</button>
+      <p class="privacy"><b>PII is redacted locally before any text reaches the model</b> — only
+      redacted text is sent, never the file. The upload exists on disk only for the duration of
+      the analysis and is deleted the moment the pipeline completes. Known limits: bare names
+      without title/patronymic/cue, and PII inside scanned images.</p>
+    </div>
+    <div class="panel-head"><span class="caps" style="color:var(--ink-faint)">System Telemetry</span><span class="dot"></span></div>
+    <div class="telemetry" id="log">
+      <div><span class="t">[--:--:--.---]</span> <span class="ok">[SYSTEM]</span> ENGINE_READY — awaiting ingestion</div>
+      <div class="cursor">_</div>
+    </div>
+  </div>
+  <div class="right">
+    <div class="panel-head"><span class="caps" style="color:var(--ink-faint)">EVOLUTION_CANVAS</span><span class="caps" id="srcflag" style="color:var(--ink-faint)"></span></div>
+    <div class="canvas-wrap" id="canvas">
+      <div class="idle">
+        <div class="big">AWAITING DATA INGESTION…</div>
+        <p>Stage a financial statement in the pipeline controls. Every claim is recomputed
+        deterministically and pinned to a verbatim source quote before anything renders here.</p>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>n==null?"n/a":Number(n).toLocaleString("en-US",{maximumFractionDigits:2});
+let file=null;
+$("drop").onclick=()=>$("file").click();
+$("drop").ondragover=e=>e.preventDefault();
+$("drop").ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])stage(e.dataTransfer.files[0]);};
+$("file").onchange=e=>{if(e.target.files[0])stage(e.target.files[0]);};
+function stage(f){file=f;$("fname").textContent=f.name;$("exec").disabled=false;}
+function ts(){const d=new Date();return`[${d.toTimeString().slice(0,8)}.${String(d.getMilliseconds()).padStart(3,"0")}]`;}
+function log(stage,status,detail,ms){
+  const line=document.createElement("div");
+  const msTag=ms!=null?`<span class="ms">${ms} ms</span>`:"";
+  line.innerHTML=`<span class="t">${ts()}</span> <span class="st-${esc(stage)}">[${esc(stage.toUpperCase())}]</span> <span class="${status==="fail"?"fail":status==="ok"?"ok":""}">${esc(status.toUpperCase())}</span> ${esc(detail||"")}${msTag}`;
+  const cur=$("log").querySelector(".cursor");$("log").insertBefore(line,cur);$("log").scrollTop=$("log").scrollHeight;
+}
+$("exec").onclick=async()=>{
+  if(!file)return;
+  $("exec").disabled=true;
+  $("canvas").innerHTML=`<div class="idle"><div class="big">PIPELINE RUNNING…</div><p>verification gate holds all output until release</p></div>`;
+  $("srcflag").textContent="";
+  const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
+  let result=null;
+  try{
+    const resp=await fetch("/api/analyze",{method:"POST",body:fd});
+    const reader=resp.body.getReader();const dec=new TextDecoder();let buf="";
+    for(;;){
+      const {done,value}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      let i;while((i=buf.indexOf("\n"))>=0){
+        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+        if(!line)continue;
+        const ev=JSON.parse(line);
+        if(ev.status!=="running")log(ev.stage,ev.status,ev.detail,ev.elapsed_ms);
+        if(ev.stage==="release")result=ev.result;
+      }
+    }
+  }catch(err){log("system","fail",String(err));}
+  $("exec").disabled=false;
+  if(result)render(result);
+};
+function render(r){
+  if(r.error){$("canvas").innerHTML=`<div class="idle" style="border-color:var(--orange)"><div class="big" style="color:var(--orange)">PIPELINE HALTED</div><p>${esc(r.error)}</p></div>`;return;}
+  $("srcflag").textContent=r.fallback_used?"SOURCE: CACHED":"SOURCE: LIVE";
+  $("srcflag").style.color=r.fallback_used?"var(--amber)":"var(--teal)";
+  let h="";
+  if(r.fallback_used)h+=`<div class="banner">⚠ CACHED — the live model call failed; the demo fallback answered. Verification below still ran for real against these facts.</div>`;
+  h+=`<div class="answer"><span class="caps">Analysis</span><div class="body">${esc(r.answer)}</div>`;
+  if(r.recommendation)h+=`<div class="rec"><b>RECOMMENDATION »</b> ${esc(r.recommendation)}</div>`;
+  h+=`</div>`;
+  h+=`<h2 class="caps section-gap">Verification flow — ${r.summary.checks_passed} pass / ${r.summary.checks_failed} mismatch · ${r.redaction_count} PII masked</h2>`;
+  h+=`<div class="flow">`;
+  r.checks.forEach((c,i)=>{
+    const cls=c.error?"warn":(c.passed?"ok":"bad");
+    const badge=c.error?"UNVERIFIABLE":(c.passed?"VERIFIED":"DISCREPANCY");
+    h+=`<div class="card ${cls}" style="animation-delay:${i*140}ms">
+      <div class="card-head"><h3>${esc(c.description)}</h3><span class="badge ${cls}">${badge}</span></div>
+      <div class="card-body">
+        <div class="grid2">
+          <div><span class="caps">Reported</span><span class="val" data-n="${c.expected??""}">${fmt(c.expected)}</span></div>
+          <div><span class="caps">Calculated</span><span class="val" data-n="${c.actual??""}" style="color:${cls==="ok"?"var(--teal)":cls==="bad"?"var(--orange)":"var(--ink)"}">${fmt(c.actual)}</span></div>
+        </div>
+        ${c.error?`<div class="variance" style="border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.05);color:var(--amber)">${esc(c.error)}</div>`:""}
+        ${(!c.passed&&!c.error)?`<div class="variance">Δ VARIANCE: ${fmt(c.actual-c.expected)}</div>`:""}
+      </div>
+    </div>`;
+    if(i<r.checks.length-1)h+=`<div class="arrow" style="animation-delay:${i*140+90}ms">→</div>`;
+  });
+  h+=`<div class="arrow" style="animation-delay:${r.checks.length*140}ms">→</div><div class="ghost" style="animation-delay:${r.checks.length*140+90}ms"><span style="font-size:28px;color:var(--line)">+</span><span class="caps" style="color:var(--ink-faint)">AWAITING NEXT PERIOD</span></div></div>`;
+  h+=`<div class="sources"><h2 class="caps">Sources — every number pinned to a verbatim quote</h2><div class="src-grid">`;
+  r.facts.forEach((f,j)=>{
+    h+=`<div class="src" style="animation-delay:${j*70}ms"><div class="top"><span class="claim">${esc(f.claim)}</span><span class="page">${esc(f.page)}</span></div>
+      <div class="val">${fmt(f.value)}</div>
+      <blockquote>${esc(f.quote||"(no quote)")}</blockquote>
+      ${f.verified_in_source?`<div class="pin">✓ quote verbatim in source</div>`:`<div class="flag">⚠ quote NOT found verbatim in source</div>`}
+    </div>`;
+  });
+  h+=`</div></div>`;
+  $("canvas").innerHTML=h;
+  if(!matchMedia("(prefers-reduced-motion: reduce)").matches){
+    document.querySelectorAll("#canvas .val[data-n]").forEach(el=>{
+      const n=parseFloat(el.dataset.n);if(!Number.isFinite(n))return;
+      const t0=performance.now(),D=550;
+      const step=t=>{const p=Math.min(1,(t-t0)/D),e=1-Math.pow(1-p,3);
+        el.textContent=fmt(n*e);
+        if(p<1)requestAnimationFrame(step);else el.textContent=fmt(n);};
+      requestAnimationFrame(step);
+    });
+  }
+}
+</script>
+</body>
+</html>
