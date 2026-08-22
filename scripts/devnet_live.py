@@ -61,6 +61,10 @@ try:
     sys.exit("BUG: a discrepant invoice was paid")
 except chain.PaymentBlocked as e:
     print("REFUSED   :", e)
+    # Negative-result notarization: the refusal itself goes on-chain, so
+    # "the agent held the money" is as publicly provable as "it paid".
+    nr = chain.notarize_refusal(result, str(e))
+    print("REFUSAL-NOTARIZED :", confirm(nr["signature"]), "|", nr["explorer"])
 
 # 4. a REAL, genuinely clean invoice, analyzed LIVE (no fallback) ->
 #    payment goes through only if it actually passes verification.

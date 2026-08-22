@@ -1096,6 +1096,17 @@ if hasattr(_ch3, "notarize_refusal"):
     check("on-chain memo says refused, with sha256",
           _memo3.startswith("veripay:refused:sha256:"))
 
+
+# ── 30. refusal notarization wired into the live proof (#15) — spec first ──
+
+print("\n=== 30. devnet_live refusal wiring ===")
+_dl = open(os.path.join(os.path.dirname(__file__), "scripts",
+                        "devnet_live.py")).read()
+check("live proof notarizes the refusal", "notarize_refusal" in _dl)
+check("refusal leg prints its own explorer line", "REFUSAL-NOTARIZED" in _dl)
+check("refusal notarization happens on the REFUSED path, before the paid leg",
+      _dl.index("notarize_refusal") < _dl.index("pay_if_verified(clean"))
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
