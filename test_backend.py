@@ -1715,12 +1715,13 @@ print("\n=== 52. reputation ===")
 import explorer as _ex52
 def _rpc52(method, params):
     if method == "getSignaturesForAddress":
-        return [{"signature": f"R{i}", "blockTime": i, "err": None} for i in range(4)]
+        return [{"signature": f"R{i}", "blockTime": i, "err": None} for i in range(5)]
     sig = params[0]
     memo = {"R0": 'Program log: Memo (len 9): "veripay:paid:sha256:aa"',
             "R1": 'Program log: Memo (len 9): "veripay:refused:sha256:bb"',
             "R2": 'Program log: Memo (len 9): "veripay:sha256:cc"',
-            "R3": 'Program log: hello'}[sig]
+            "R3": 'Program log: hello',
+            "R4": 'Program log: Memo (len 9): "veripay:paid:sha256:dd"'}[sig]
     delta_in = sig in ("R0",)
     pre = [5, 0] if delta_in else [5, 1]
     post = [4, 1] if delta_in else [5, 0]
@@ -1740,7 +1741,7 @@ check("verified payments sent counted", _rep.get("paid_sent") == 1)
 check("notarized refusals counted", _rep.get("refusals") == 1)
 check("audit anchors counted", _rep.get("anchored") == 1)
 check("window is explicit, never implied as lifetime",
-      _rep.get("window") == 4)
+      _rep.get("window") == 5)
 _h52 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
 check("UI renders the reputation badge with honest window wording",
       "REPUTATION" in _h52 and "latest" in _h52

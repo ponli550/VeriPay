@@ -623,6 +623,17 @@ function renderWallet(w){
   if(w.rate_limited){
     h+=`<div class="banner" style="border-color:var(--amber);color:var(--amber);background:rgba(245,158,11,.06)">public RPC rate-limited — showing partial history (${w.txs.length} of ${w.requested}); the data is public, retry in a moment</div>`;
   }
+  const rep=w.reputation||{};
+  if((rep.paid_received||rep.paid_sent||rep.refusals||rep.anchored)>0){
+    h+=`<div class="answer" style="border-left-color:var(--teal);margin-bottom:10px;padding:12px 14px">
+      <span class="caps" style="color:var(--teal)">ON-CHAIN REPUTATION — latest ${rep.window} tx window</span>
+      <div class="mono" style="font-size:12px;margin-top:6px;color:var(--ink)">
+        ${rep.paid_received||0} verified payment(s) received · ${rep.paid_sent||0} sent ·
+        <span style="color:${rep.refusals?"var(--purple)":"var(--ink-faint)"}">${rep.refusals||0} notarized refusal(s)</span> ·
+        ${rep.anchored||0} audit anchor(s)</div>
+      <div class="mono" style="font-size:10px;color:var(--ink-faint);margin-top:4px">derived only from veripay:* memos on-chain in this window — a notarized refusal cannot be faked or deleted; absence of history is not a judgment</div>
+    </div>`;
+  }
   h+=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
     <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div>
     <button class="exec" id="wshare" style="margin-top:8px;width:auto;padding:6px 14px;background:none;border:1px solid var(--info);color:var(--info)">SHARE AUDIT LINK</button>

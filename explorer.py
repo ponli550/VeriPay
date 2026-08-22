@@ -127,8 +127,25 @@ def fetch_activity(address: str, limit: int = 12, network: str = "devnet",
     for row in txs:
         row["counterparty_sanctioned"] = (
             row["counterparty"] in screening.addresses())
+    # Reputation from the chain itself: veripay memos in the fetched
+    # window. Star ratings are gameable; a notarized refusal is not.
+    # Always reported WITH its window — never implied as lifetime.
+    reputation = {
+        "paid_received": sum(1 for t in txs if t["veripay"]
+                             and t["memo"].startswith("veripay:paid")
+                             and t["delta"] > 0),
+        "paid_sent": sum(1 for t in txs if t["veripay"]
+                         and t["memo"].startswith("veripay:paid")
+                         and t["delta"] <= 0),
+        "refusals": sum(1 for t in txs
+                        if t["memo"].startswith("veripay:refused")),
+        "anchored": sum(1 for t in txs
+                        if t["memo"].startswith("veripay:sha256")),
+        "window": len(sigs),
+    }
     result = {"address": address, "network": network, "txs": txs,
               "rate_limited": rate_limited, "requested": len(sigs),
+              "reputation": reputation,
               "sanctions": screening.check(address), "cached": False}
     _cache[key] = (time.time(), result)
     while len(_cache) > _CACHE_CAP:
