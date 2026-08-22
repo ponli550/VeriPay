@@ -601,6 +601,43 @@ if _has_ch:
             os.environ["SOLANA_SECRET_KEY"] = _old
 
 
+
+# ── 22. contribution card — real address, real QR, no fabrications ─────────
+# Written BEFORE the implementation.
+
+print("\n=== 22. contribution card ===")
+try:
+    import server as _sv2
+    from fastapi.testclient import TestClient as _TC2
+    _c2 = _TC2(_sv2.app)
+    _old_addr = os.environ.pop("VERIPAY_WALLET_ADDRESS", None)
+    _old_url = os.environ.pop("VERIPAY_WALLET_URL", None)
+    try:
+        _r = _c2.get("/api/contribution")
+        check("no address configured -> 204, card stays hidden",
+              _r.status_code == 204)
+        os.environ["VERIPAY_WALLET_ADDRESS"] = "TestAddr123abc"
+        _r = _c2.get("/api/contribution")
+        _j = _r.json()
+        check("configured address is returned",
+              _r.status_code == 200 and _j["address"] == "TestAddr123abc")
+        check("QR is generated locally as a data URI",
+              _j["qr"].startswith("data:image/svg"))
+        _page = _c2.get("/").text
+        check("frontend carries the contribution card markup",
+              "CONTRIBUTION_PROTOCOL" in _page and "COPY_ADDRESS" in _page)
+        check("no hotlinked placeholder QR, no placeholder address",
+              "googleusercontent" not in _page and "HATA...Solana" not in _page)
+    finally:
+        os.environ.pop("VERIPAY_WALLET_ADDRESS", None)
+        if _old_addr is not None:
+            os.environ["VERIPAY_WALLET_ADDRESS"] = _old_addr
+        if _old_url is not None:
+            os.environ["VERIPAY_WALLET_URL"] = _old_url
+except Exception as _e:
+    print(f"  FAIL contribution spec crashed: {_e}")
+    FAIL += 1
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
