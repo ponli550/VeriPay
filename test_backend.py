@@ -1060,6 +1060,14 @@ if _has_sc:
         check("sanctioned recipient refused as SANCTIONS_LIST_MATCH",
               "SANCTIONS_LIST_MATCH" in str(e) and "OFAC" in str(e))
 
+    _page28 = _c4.get("/").text if "_c4" in dir() else __import__("fastapi.testclient", fromlist=["TestClient"]).TestClient(__import__("server").app).get("/").text
+    check("UI renders the sanctions banner wording",
+          "SANCTIONED" in _page28 and "OFAC" in _page28)
+    check("UI flags sanctioned counterparties on tx rows",
+          "counterparty_sanctioned" in _page28)
+    check("UI empty state is non-coverage, never 'safe'",
+          "no public sanctions reports found" in _page28.lower())
+
 # ── 29. refusal notarization — spec BEFORE code ────────────────────────────
 
 print("\n=== 29. refusal notarization ===")
