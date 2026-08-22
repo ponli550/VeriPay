@@ -1531,6 +1531,16 @@ try:
 except ValueError:
     check("pure validation still rejects garbage", True)
 
+
+# ── 46. viewer-mode honesty (restored after rebuild loss) ──────────────────
+
+print("\n=== 46. viewer mode ===")
+_h46 = open(os.path.join(os.path.dirname(__file__), "web",
+                         "index.html")).read()
+check("engine probed; viewer announces itself; wallet button gated",
+      '"/api/analyze"' in _h46 and "405" in _h46 and "viewerMode" in _h46
+      and "VIEWER MODE" in _h46 and "renders shared boards" in _h46)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")

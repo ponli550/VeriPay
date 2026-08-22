@@ -7,3 +7,4 @@ clean_invoice.pdf
 sample_report.xlsx
 .vercel
 .env*
+.wrangler/
