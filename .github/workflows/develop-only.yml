@@ -1,0 +1,15 @@
+name: develop-only
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  develop-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: main accepts merges from develop only
+        run: |
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "::error::PRs into main must come from develop (got: ${{ github.head_ref }})"
+            exit 1
+          fi
+          echo "source branch is develop — OK"

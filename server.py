@@ -14,7 +14,7 @@ import os
 import tempfile
 
 from fastapi import FastAPI, Form, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 
 import backend
 
@@ -26,6 +26,21 @@ _WEB = os.path.join(os.path.dirname(__file__), "web", "index.html")
 @app.get("/")
 def index():
     return FileResponse(_WEB, media_type="text/html")
+
+
+@app.get("/api/contribution")
+def contribution():
+    """Developer tips / contribution target. The address comes from .env
+    (a Hata deposit address on Solana, or any wallet); the QR is generated
+    locally from the real value — no placeholder image, no hotlink. With
+    nothing configured the endpoint 204s and the card never renders."""
+    address = os.environ.get("VERIPAY_WALLET_ADDRESS", "").strip()
+    if not address:
+        return Response(status_code=204)
+    import segno
+    target = os.environ.get("VERIPAY_WALLET_URL", "").strip() or address
+    qr = segno.make(target, error="m").svg_data_uri(scale=4, dark="#e2e2e2", light=None)
+    return {"address": address, "url": target, "qr": qr}
 
 
 @app.post("/api/analyze")
