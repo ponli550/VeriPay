@@ -831,12 +831,17 @@ except Exception as _e:
     print(f"  (hata import failed: {_e})")
 check("hata module importable", _has_ht)
 if _has_ht:
-    import hashlib as _hhl, hmac as _hm
-    # signature: HMAC-SHA256 over the alphabetically-sorted canonical string
-    _qs, _sig = _ht.sign({"token_symbol": "SOL", "network_name": "Solana",
-                          "timestamp": 1730000000}, "s3cret")
-    _keys = [p.split("=")[0] for p in _qs.split("&")]
-    check("params sorted alphabetically", _keys == sorted(_keys), _qs)
+    import hashlib as _hhl, hmac as _hm, json as _js
+    # signature: HMAC-SHA256 over the compact JSON of the sorted params.
+    # (Confirmed against the live API 2026-08-22: the raw k=v&k=v scheme
+    # was rejected with "invalid hash" on every base/method tried; the
+    # compact-JSON-of-sorted-body canonicalization is what the exchange
+    # actually verifies.)
+    _params = {"token_symbol": "SOL", "network_name": "Solana",
+               "timestamp": 1730000000}
+    _qs, _sig = _ht.sign(_params, "s3cret")
+    check("canonical string is compact sorted-key JSON",
+          _qs == _js.dumps(_params, sort_keys=True, separators=(",", ":")), _qs)
     check("signature is hmac-sha256 of the canonical string",
           _sig == _hm.new(b"s3cret", _qs.encode(), _hhl.sha256).hexdigest())
     # read-only enforcement: only allowlisted retrieval paths may be called
