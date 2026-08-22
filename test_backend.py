@@ -1777,6 +1777,18 @@ check("2D draw-in trick, motion-safe",
 check("graph is honest about scope",
       "within the fetched window" in _h54)
 
+
+# ── 55. rent-safe payment default — spec BEFORE code (#33) ─────────────────
+
+print("\n=== 55. rent-safe default ===")
+_sv55 = open(os.path.join(os.path.dirname(__file__), "server.py")).read()
+_h55 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+check("server default payment covers rent-exempt minimum",
+      'body.get("lamports", 1_000_000)' in _sv55
+      and "1000)" not in _sv55.split('body.get("lamports"')[1][:40])
+check("page requests a rent-safe amount",
+      "lamports:1000000" in _h55.replace(" ","") and "lamports:1000}" not in _h55.replace(" ",""))
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
