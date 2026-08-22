@@ -554,6 +554,9 @@ function renderWallet(w){
   }else{
     h+=`<div class="mono" style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">screening: ${esc(sx.note||"no public sanctions reports found")} · ${esc(sx.source||"OFAC SDN")} · absence of reports is not an assertion of safety</div>`;
   }
+  if(w.rate_limited){
+    h+=`<div class="banner" style="border-color:var(--amber);color:var(--amber);background:rgba(245,158,11,.06)">public RPC rate-limited — showing partial history (${w.txs.length} of ${w.requested}); the data is public, retry in a moment</div>`;
+  }
   h+=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
     <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div>
     <button class="exec" id="wshare" style="margin-top:8px;width:auto;padding:6px 14px;background:none;border:1px solid var(--info);color:var(--info)">SHARE AUDIT LINK</button>
