@@ -1,0 +1,6 @@
+{
+  // VeriPay shared-board viewer: static assets only — see FinVerify note.
+  "name": "veripay",
+  "compatibility_date": "2026-08-22",
+  "assets": { "directory": "./web" }
+}
