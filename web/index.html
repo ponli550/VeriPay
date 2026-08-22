@@ -132,6 +132,17 @@ h2.caps{color:var(--ink-faint);font-size:11px}
       the analysis and is deleted the moment the pipeline completes. Known limits: bare names
       without title/patronymic/cue, and PII inside scanned images.</p>
     </div>
+    <div class="controls" style="border-top:1px solid var(--line)">
+      <div class="caps" style="color:var(--purple);margin-bottom:8px">WALLET_AUDIT — any address, read-only</div>
+      <input class="q" id="waddr" placeholder="paste any Solana address">
+      <div style="display:flex;gap:8px">
+        <select class="q" id="wnet" style="width:110px;margin-bottom:0">
+          <option value="devnet">devnet</option>
+          <option value="mainnet">mainnet</option>
+        </select>
+        <button class="exec" id="wgo" style="margin-bottom:0">AUDIT WALLET</button>
+      </div>
+    </div>
     <div class="panel-head"><span class="caps" style="color:var(--ink-faint)">System Telemetry</span><span class="dot"></span></div>
     <div class="telemetry" id="log">
       <div><span class="t">[--:--:--.---]</span> <span class="ok">[SYSTEM]</span> ENGINE_READY — awaiting ingestion</div>
@@ -154,6 +165,44 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=n=>n==null?"n/a":Number(n).toLocaleString("en-US",{maximumFractionDigits:2});
 let file=null,contrib=null;
+$("wgo").onclick=async()=>{
+  const a=$("waddr").value.trim();if(!a)return;
+  $("wgo").disabled=true;
+  $("canvas").innerHTML=`<div class="idle"><div class="big">AUDITING ${esc(a.slice(0,8))}…</div><p>reading public chain data — no keys, no custody</p></div>`;
+  try{
+    const r=await fetch(`/api/wallet?address=${encodeURIComponent(a)}&network=${$("wnet").value}`);
+    if(!r.ok){throw new Error(await r.text());}
+    renderWallet(await r.json());
+  }catch(e){
+    $("canvas").innerHTML=`<div class="idle" style="border-color:var(--orange)"><div class="big" style="color:var(--orange)">AUDIT FAILED</div><p>${esc(e.message)}</p></div>`;
+  }
+  $("wgo").disabled=false;
+};
+function renderWallet(w){
+  let h=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
+    <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div></div>`;
+  if(!w.txs.length){
+    h+=`<div class="idle"><div class="big">NO ACTIVITY</div><p>no transactions found for this address on ${esc(w.network)}</p></div>`;
+    $("canvas").innerHTML=h;return;
+  }
+  h+=`<h2 class="caps section-gap">Recent activity — ${w.txs.length} transaction(s)</h2><div class="flow">`;
+  w.txs.forEach((t,i)=>{
+    const inb=t.delta>=0, col=t.err?"var(--orange)":(t.veripay?"var(--purple)":inb?"var(--teal)":"var(--ink-dim)");
+    h+=`<div class="card ${t.err?"bad":t.veripay?"":"ok"}" style="animation-delay:${i*110}ms;border-left-color:${col};border-top-color:${col}">
+      <div class="card-head"><h3>${t.time?new Date(t.time*1000).toLocaleString():"—"}</h3>
+        <span class="badge ${t.err?"bad":"ok"}" style="color:${col};border-color:${col}">${t.err?"FAILED":(inb?"IN":"OUT")}</span></div>
+      <div class="card-body">
+        <div class="grid2"><div><span class="caps">Δ balance</span><span class="val" style="color:${col}">${(t.delta/1e9).toFixed(6)} SOL</span></div>
+        <div><span class="caps">Counterparty</span><span class="val" style="font-size:11px;word-break:break-all">${esc((t.counterparty||"—").slice(0,12))}…</span></div></div>
+        ${t.memo?`<div class="eq"><span class="caps">${t.veripay?"VERIPAY AUDIT MEMO":"MEMO"}</span><div class="expr" style="font-size:11px;word-break:break-all;color:${t.veripay?"var(--purple)":"var(--ink-dim)"}">${esc(t.memo)}</div></div>`:""}
+        <a class="mono" style="font-size:10px;color:var(--info)" target="_blank"
+           href="https://explorer.solana.com/tx/${esc(t.signature)}?cluster=${w.network==="mainnet"?"mainnet-beta":"devnet"}">${esc(t.signature.slice(0,20))}… ↗</a>
+      </div></div>`;
+    if(i<w.txs.length-1)h+=`<div class="arrow" style="animation-delay:${i*110+80}ms">→</div>`;
+  });
+  h+=`</div>`;
+  $("canvas").innerHTML=h;
+}
 fetch("/api/contribution").then(r=>r.status===200?r.json():null).then(j=>{contrib=j;}).catch(()=>{});
 $("drop").onclick=()=>$("file").click();
 $("drop").ondragover=e=>e.preventDefault();

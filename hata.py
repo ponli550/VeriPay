@@ -10,8 +10,11 @@ regulated exchange account. Retrieval only:
     the test suite asserts that stays true.
 
 Auth per Hata's developer docs: every request carries a `timestamp`,
-params are sorted alphabetically, the canonical string is signed with
-HMAC-SHA256, and the request carries `X-API-KEY` + `Signature` headers.
+params are sorted alphabetically and rendered as compact JSON, the
+canonical string is signed with HMAC-SHA256, and the request carries
+`X-API-KEY` + `Signature` headers. (Confirmed against the live API —
+see sign() for the canonicalization detail their PHP pseudocode left
+ambiguous.)
 """
 
 import hashlib
@@ -51,9 +54,15 @@ def _keys() -> tuple[str, str]:
 
 
 def sign(params: dict, secret: str) -> tuple[str, str]:
-    """Canonical string = alphabetically-sorted key=value pairs joined
-    with '&'; signature = HMAC-SHA256 hex over it."""
-    canonical = "&".join(f"{k}={params[k]}" for k in sorted(params))
+    """Canonical string = compact JSON of the params with keys sorted
+    alphabetically (no whitespace); signature = HMAC-SHA256 hex over it.
+
+    Confirmed against the live API: the raw k=v&k=v-joined scheme from
+    Hata's PHP pseudocode reads ambiguous and turned out wrong — every
+    base URL / HTTP method combination using it was rejected with
+    "invalid hash". This compact-JSON form is what the exchange verifies.
+    """
+    canonical = json.dumps(params, sort_keys=True, separators=(",", ":"))
     sig = hmac_lib.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
     return canonical, sig
 
@@ -89,6 +98,11 @@ def get_deposit_address(token_symbol: str = "SOL",
     data = request("/wallet/sapi/address/deposit",
                    {"token_symbol": token_symbol, "network_name": network_name},
                    transport=transport)
+    # Live responses nest the payload under "data", sibling to
+    # "is_exist"/"status"; fall back to the top level for anything
+    # (e.g. a test transport) that already hands back a flat dict.
+    payload = data.get("data") if isinstance(data.get("data"), dict) else data
+    data = payload
     return {
         "address": data.get("DepositAddress", ""),
         "network": data.get("Network", network_name),

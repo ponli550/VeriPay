@@ -710,6 +710,13 @@ try:
     _c2 = _TC2(_sv2.app)
     _old_addr = os.environ.pop("VERIPAY_WALLET_ADDRESS", None)
     _old_url = os.environ.pop("VERIPAY_WALLET_URL", None)
+    # This spec is about the no-config case; isolate it from any real
+    # HATA_API_KEY/SECRET a developer's .env may have loaded (via
+    # backend.load_dotenv()), otherwise it silently exercises the live
+    # Hata path instead of the 204-hidden path under test.
+    _old_hkey = os.environ.pop("HATA_API_KEY", None)
+    _old_hsec = os.environ.pop("HATA_API_SECRET", None)
+    _sv2._hata_cached = None
     try:
         _r = _c2.get("/api/contribution")
         check("no address configured -> 204, card stays hidden",
@@ -732,6 +739,11 @@ try:
             os.environ["VERIPAY_WALLET_ADDRESS"] = _old_addr
         if _old_url is not None:
             os.environ["VERIPAY_WALLET_URL"] = _old_url
+        if _old_hkey is not None:
+            os.environ["HATA_API_KEY"] = _old_hkey
+        if _old_hsec is not None:
+            os.environ["HATA_API_SECRET"] = _old_hsec
+        _sv2._hata_cached = None
 except Exception as _e:
     print(f"  FAIL contribution spec crashed: {_e}")
     FAIL += 1
@@ -831,12 +843,17 @@ except Exception as _e:
     print(f"  (hata import failed: {_e})")
 check("hata module importable", _has_ht)
 if _has_ht:
-    import hashlib as _hhl, hmac as _hm
-    # signature: HMAC-SHA256 over the alphabetically-sorted canonical string
-    _qs, _sig = _ht.sign({"token_symbol": "SOL", "network_name": "Solana",
-                          "timestamp": 1730000000}, "s3cret")
-    _keys = [p.split("=")[0] for p in _qs.split("&")]
-    check("params sorted alphabetically", _keys == sorted(_keys), _qs)
+    import hashlib as _hhl, hmac as _hm, json as _js
+    # signature: HMAC-SHA256 over the compact JSON of the sorted params.
+    # (Confirmed against the live API 2026-08-22: the raw k=v&k=v scheme
+    # was rejected with "invalid hash" on every base/method tried; the
+    # compact-JSON-of-sorted-body canonicalization is what the exchange
+    # actually verifies.)
+    _params = {"token_symbol": "SOL", "network_name": "Solana",
+               "timestamp": 1730000000}
+    _qs, _sig = _ht.sign(_params, "s3cret")
+    check("canonical string is compact sorted-key JSON",
+          _qs == _js.dumps(_params, sort_keys=True, separators=(",", ":")), _qs)
     check("signature is hmac-sha256 of the canonical string",
           _sig == _hm.new(b"s3cret", _qs.encode(), _hhl.sha256).hexdigest())
     # read-only enforcement: only allowlisted retrieval paths may be called
@@ -852,8 +869,11 @@ if _has_ht:
     _seen = {}
     def _cap(url, headers, body):
         _seen.update(url=url, headers=headers, body=body)
-        return {"DepositAddress": "So1anaAddr", "Network": "Solana",
-                "Symbol": "SOL", "Tag": ""}
+        # Real shape confirmed live 2026-08-22: payload is nested under
+        # "data", sibling to "is_exist"/"status" — not top-level fields.
+        return {"data": {"DepositAddress": "So1anaAddr", "Network": "Solana",
+                          "Symbol": "SOL", "Tag": ""},
+                "is_exist": True, "status": "success"}
     _old = {k: os.environ.pop(k, None) for k in ("HATA_API_KEY", "HATA_API_SECRET")}
     os.environ["HATA_API_KEY"] = "kid"
     os.environ["HATA_API_SECRET"] = "sek"
@@ -898,6 +918,64 @@ if _has_ht:
         os.environ.pop("HATA_API_KEY", None); os.environ.pop("HATA_API_SECRET", None)
         if _oa is not None:
             os.environ["VERIPAY_WALLET_ADDRESS"] = _oa
+
+
+# ── 26. wallet audit (paste-any-address, read-only) — spec BEFORE code ─────
+
+print("\n=== 26. wallet audit ===")
+try:
+    import explorer as _ex
+    _has_ex = True
+except Exception as _e:
+    _has_ex = False
+    print(f"  (explorer import failed: {_e})")
+check("explorer module importable", _has_ex)
+if _has_ex:
+    _ADDR = "6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz"
+    try:
+        _ex.fetch_activity("not-a-pubkey!!", transport=lambda m, p: {})
+        check("invalid address raises ValueError", False)
+    except ValueError:
+        check("invalid address raises ValueError", True)
+    _ncalls = {"n": 0}
+    def _rpc_fake(method, params):
+        _ncalls["n"] += 1
+        if method == "getSignaturesForAddress":
+            return [{"signature": "SIG1", "blockTime": 1730000000, "err": None},
+                    {"signature": "SIG2", "blockTime": 1730000100, "err": None}]
+        if method == "getTransaction":
+            sig = params[0]
+            memo = ('Program log: Memo (len 84): '
+                    '"veripay:paid:sha256:abcd"') if sig == "SIG1" else \
+                   'Program log: hello'
+            return {"blockTime": 1730000000,
+                    "meta": {"err": None, "preBalances": [5000000, 0],
+                             "postBalances": [4000000, 1000000],
+                             "logMessages": [memo]},
+                    "transaction": {"message": {"accountKeys": [
+                        {"pubkey": "PayerXYZ"}, {"pubkey": _ADDR}]}}}
+        return None
+    _ex._cache.clear()
+    _out = _ex.fetch_activity(_ADDR, limit=2, transport=_rpc_fake)
+    check("returns tx rows", len(_out["txs"]) == 2)
+    _t = _out["txs"][0]
+    check("delta computed for the queried address",
+          _t["delta"] == 1000000, str(_t))
+    check("veripay memo decoded and flagged",
+          _t["memo"].startswith("veripay:paid") and _t["veripay"] is True)
+    check("counterparty surfaced", _t["counterparty"] == "PayerXYZ")
+    _before = _ncalls["n"]
+    _out2 = _ex.fetch_activity(_ADDR, limit=2, transport=_rpc_fake)
+    check("second call served from cache", _ncalls["n"] == _before
+          and _out2["cached"] is True)
+    import server as _sv4
+    from fastapi.testclient import TestClient as _TC4
+    _c4 = _TC4(_sv4.app)
+    check("bad address -> 400 from the endpoint",
+          _c4.get("/api/wallet", params={"address": "zz!!"}).status_code == 400)
+    _page = _c4.get("/").text
+    check("frontend carries the wallet audit section",
+          "WALLET_AUDIT" in _page)
 
 # ── Summary ───────────────────────────────────────────────────────────────
 
