@@ -185,6 +185,10 @@ Schema:
     {"id": "f1", "claim": "short label", "value": 1200000,
      "page": "Page 1", "quote": "the exact line copied from the document"}
   ],
+  "risks": [
+    {"description": "the risk in plain language", "severity": "low|medium|high",
+     "evidence_fact_ids": ["f1", "f4"]}
+  ],
   "checks": [
     {"description": "what this verifies",
      "operation": "sum",
@@ -203,6 +207,13 @@ Rules:
 - Whenever your answer relies on arithmetic, add a check for it. If the
   document states a total, ALWAYS add a check comparing it to the sum of
   its line items.
+- List trends, exceptions, and potential risks in "risks". Every risk MUST
+  cite evidence_fact_ids pointing at entries in "facts" — a risk with no
+  evidence will be discarded.
+- When the document contains more than one period, ALWAYS add a
+  percent_change check for each key metric using operand_fact_ids
+  [prior_period_fact, current_period_fact]; if the document states the
+  growth rate, reference that fact with "against_fact_id".
 - "against_fact_id" must reference the fact holding the figure the
   DOCUMENT states (e.g. the stated total). Never set "expected_value"
   to a number you computed yourself — the comparison target must be a
@@ -561,6 +572,7 @@ def analyze_stream(file_path: str, question: str):
         result["answer"] = str(raw.get("answer", "")).strip()
         result["recommendation"] = str(raw.get("recommendation", "")).strip()
         result["facts"] = _clean_facts(raw.get("facts"))
+        result["risks"] = _clean_risks(raw.get("risks"), result["facts"])
         result["checks"] = verify(result["facts"], raw.get("checks"))
         checks = result["checks"]
         result["summary"] = {
@@ -606,8 +618,13 @@ def _empty_result() -> dict:
     return {
         "answer": "",
         "recommendation": "",
+        "risks": [],
         "facts": [],
-        "checks": [],
+        "risks": [
+    {"description": "the risk in plain language", "severity": "low|medium|high",
+     "evidence_fact_ids": ["f1", "f4"]}
+  ],
+  "checks": [],
         "redaction_count": 0,
         "redacted_preview": "",
         "fallback_used": False,
@@ -615,6 +632,27 @@ def _empty_result() -> dict:
                     "checks_passed": 0, "checks_failed": 0},
         "error": None,
     }
+
+
+def _clean_risks(risks, facts) -> list[dict]:
+    """Keep only risks whose EVERY evidence id resolves to an extracted
+    fact — an uncited or phantom-cited risk is an unsupported claim and
+    does not reach the user. Explainability, enforced."""
+    known = {str(f.get("id")) for f in facts or []}
+    out = []
+    for r in risks or []:
+        if not isinstance(r, dict):
+            continue
+        ids = [str(i) for i in (r.get("evidence_fact_ids") or [])]
+        if not ids or not set(ids) <= known:
+            continue
+        sev = str(r.get("severity", "medium")).lower()
+        out.append({
+            "description": str(r.get("description", "")).strip(),
+            "severity": sev if sev in ("low", "medium", "high") else "medium",
+            "evidence_fact_ids": ids,
+        })
+    return out
 
 
 def analyze(file_path: str, question: str) -> dict:

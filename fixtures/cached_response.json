@@ -28,6 +28,20 @@
       "value": 2750000,
       "page": "Page 1",
       "quote": "Total revenue 2,750,000"
+    },
+    {
+      "id": "f5",
+      "claim": "Total revenue prior quarter",
+      "value": 2500000,
+      "page": "Page 2",
+      "quote": "Total revenue prior quarter 2,500,000"
+    },
+    {
+      "id": "f6",
+      "claim": "Stated revenue growth vs prior quarter (%)",
+      "value": 10.0,
+      "page": "Page 2",
+      "quote": "Revenue growth vs prior quarter: 10.0%"
     }
   ],
   "checks": [
@@ -41,7 +55,38 @@
       ],
       "expected_value": 2750000,
       "against_fact_id": "f4"
+    },
+    {
+      "description": "Revenue growth vs prior quarter matches the stated rate",
+      "operation": "percent_change",
+      "operand_fact_ids": [
+        "f5",
+        "f4"
+      ],
+      "against_fact_id": "f6",
+      "expected_value": 10.0
     }
   ],
-  "recommendation": "Reconcile the RM 100,000 gap between the stated total revenue (RM 2,750,000) and the sum of its segments (RM 2,650,000) before this report is signed off."
+  "recommendation": "Reconcile the RM 100,000 gap between the stated total revenue (RM 2,750,000) and the sum of its segments (RM 2,650,000) before this report is signed off.",
+  "risks": [
+    {
+      "description": "Stated total revenue exceeds the sum of its segments by RM 100,000 — the composition of the headline figure does not reconcile.",
+      "severity": "high",
+      "evidence_fact_ids": [
+        "f1",
+        "f2",
+        "f3",
+        "f4"
+      ]
+    },
+    {
+      "description": "Reported 10% quarter-on-quarter growth is computed from the stated total, which itself fails its composition check — the trend inherits the discrepancy.",
+      "severity": "medium",
+      "evidence_fact_ids": [
+        "f4",
+        "f5",
+        "f6"
+      ]
+    }
+  ]
 }

@@ -471,6 +471,52 @@ if _has_srv and os.path.exists("sample_report.pdf"):
         os.environ.pop("DEMO_FALLBACK", None)
 
 
+# ── 21. Trends & risks (Lab 1: "trends, patterns, exceptions, risks") ──────
+# Written BEFORE the implementation.
+
+print("\n=== 21. Trends & risks ===")
+check("prompt demands structured risks", '"risks"' in backend.SYSTEM_PROMPT)
+check("prompt demands percent_change trend checks for multi-period docs",
+      "percent_change" in backend.SYSTEM_PROMPT
+      and "period" in backend.SYSTEM_PROMPT.lower())
+with open(os.path.join(os.path.dirname(__file__), "fixtures",
+                       "cached_response.json")) as fh:
+    _fx3 = json.load(fh)
+check("fixture carries at least one evidenced risk",
+      any(r.get("evidence_fact_ids") for r in _fx3.get("risks", [])))
+check("fixture carries a percent_change trend check",
+      any(c.get("operation") == "percent_change" for c in _fx3.get("checks", [])))
+# evidence discipline: a risk citing an unknown fact id is excluded outright
+_kept = backend._clean_risks(
+    [{"description": "real", "severity": "HIGH", "evidence_fact_ids": ["f1"]},
+     {"description": "phantom", "severity": "low", "evidence_fact_ids": ["f1", "f99"]},
+     {"description": "uncited", "severity": "low", "evidence_fact_ids": []},
+     "not a dict"],
+    [{"id": "f1"}])
+check("evidenced risk kept with normalised severity",
+      len(_kept) == 1 and _kept[0]["severity"] == "high")
+if os.path.exists("sample_report.pdf"):
+    _pages = backend.parse_pdf("sample_report.pdf")
+    check("sample now carries a prior period (page 2)",
+          len(_pages) >= 2 and "prior quarter" in _pages[1][1].lower())
+    _ks = {k: os.environ.pop(k, None) for k in ("DEEPSEEK_API_KEY", "deepseek_api")}
+    os.environ["DEMO_FALLBACK"] = "1"
+    try:
+        _o = backend.analyze("sample_report.pdf", "How did revenue trend, and what are the risks?")
+        check("analyze surfaces evidenced risks", len(_o.get("risks") or []) > 0)
+        _fids = {f["id"] for f in _o["facts"]}
+        check("every surfaced risk cites known facts",
+              all(set(r["evidence_fact_ids"]) <= _fids for r in _o["risks"]))
+        _trend = [c for c in _o["checks"] if "growth" in c["description"].lower()
+                  or "prior" in c["description"].lower()]
+        check("the trend check verifies deterministically",
+              any(c.get("passed") for c in _trend), f"trend checks: {_trend}")
+    finally:
+        for k, v in _ks.items():
+            if v is not None:
+                os.environ[k] = v
+        os.environ.pop("DEMO_FALLBACK", None)
+
 # ── 20. chain layer — verification-gated payments, written BEFORE the code ─
 
 print("\n=== 20. chain (Solana devnet, offline fake transport) ===")
@@ -553,6 +599,7 @@ if _has_ch:
     finally:
         if _old is not None:
             os.environ["SOLANA_SECRET_KEY"] = _old
+
 
 # ── Summary ───────────────────────────────────────────────────────────────
 

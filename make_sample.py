@@ -46,6 +46,14 @@ def build_pdf(path: str = "sample_report.pdf") -> None:
     line("Total operating expenses 1,450,000", gap=10 * mm)
 
     c.showPage()
+
+    # Page 2 — prior-quarter comparison, so a trend exists to verify.
+    y = height - 30 * mm
+    line("Prior Quarter Comparison (Q2 2025)", size=13, bold=True, gap=10 * mm)
+    line("Total revenue prior quarter 2,500,000", gap=6 * mm)
+    line("Revenue growth vs prior quarter: 10.0%", gap=6 * mm)
+
+    c.showPage()
     c.save()
 
 

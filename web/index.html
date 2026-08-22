@@ -200,6 +200,17 @@ function render(r){
   h+=`<div class="answer"><span class="caps">Analysis</span><div class="body">${esc(r.answer)}</div>`;
   if(r.recommendation)h+=`<div class="rec"><b>RECOMMENDATION »</b> ${esc(r.recommendation)}</div>`;
   h+=`</div>`;
+  if(r.risks&&r.risks.length){
+    h+=`<h2 class="caps section-gap">Risks — every one cites its evidence</h2>`;
+    r.risks.forEach(k=>{
+      const col=k.severity==="high"?"var(--orange)":k.severity==="medium"?"var(--amber)":"var(--ink-faint)";
+      h+=`<div class="answer" style="border-left-color:${col};margin-bottom:10px;padding:12px 14px">
+        <span class="caps" style="color:${col}">${esc(k.severity)} risk</span>
+        <div class="body" style="font-size:13px;margin-top:4px">${esc(k.description)}</div>
+        <div class="mono" style="font-size:11px;color:var(--ink-faint);margin-top:6px">evidence: ${k.evidence_fact_ids.map(esc).join(", ")}</div>
+      </div>`;
+    });
+  }
   h+=`<h2 class="caps section-gap">Verification flow — ${r.summary.checks_passed} pass / ${r.summary.checks_failed} mismatch · ${r.redaction_count} PII masked</h2>`;
   h+=`<div class="flow">`;
   r.checks.forEach((c,i)=>{
