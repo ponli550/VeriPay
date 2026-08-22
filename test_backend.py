@@ -919,6 +919,64 @@ if _has_ht:
         if _oa is not None:
             os.environ["VERIPAY_WALLET_ADDRESS"] = _oa
 
+
+# ── 26. wallet audit (paste-any-address, read-only) — spec BEFORE code ─────
+
+print("\n=== 26. wallet audit ===")
+try:
+    import explorer as _ex
+    _has_ex = True
+except Exception as _e:
+    _has_ex = False
+    print(f"  (explorer import failed: {_e})")
+check("explorer module importable", _has_ex)
+if _has_ex:
+    _ADDR = "6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz"
+    try:
+        _ex.fetch_activity("not-a-pubkey!!", transport=lambda m, p: {})
+        check("invalid address raises ValueError", False)
+    except ValueError:
+        check("invalid address raises ValueError", True)
+    _ncalls = {"n": 0}
+    def _rpc_fake(method, params):
+        _ncalls["n"] += 1
+        if method == "getSignaturesForAddress":
+            return [{"signature": "SIG1", "blockTime": 1730000000, "err": None},
+                    {"signature": "SIG2", "blockTime": 1730000100, "err": None}]
+        if method == "getTransaction":
+            sig = params[0]
+            memo = ('Program log: Memo (len 84): '
+                    '"veripay:paid:sha256:abcd"') if sig == "SIG1" else \
+                   'Program log: hello'
+            return {"blockTime": 1730000000,
+                    "meta": {"err": None, "preBalances": [5000000, 0],
+                             "postBalances": [4000000, 1000000],
+                             "logMessages": [memo]},
+                    "transaction": {"message": {"accountKeys": [
+                        {"pubkey": "PayerXYZ"}, {"pubkey": _ADDR}]}}}
+        return None
+    _ex._cache.clear()
+    _out = _ex.fetch_activity(_ADDR, limit=2, transport=_rpc_fake)
+    check("returns tx rows", len(_out["txs"]) == 2)
+    _t = _out["txs"][0]
+    check("delta computed for the queried address",
+          _t["delta"] == 1000000, str(_t))
+    check("veripay memo decoded and flagged",
+          _t["memo"].startswith("veripay:paid") and _t["veripay"] is True)
+    check("counterparty surfaced", _t["counterparty"] == "PayerXYZ")
+    _before = _ncalls["n"]
+    _out2 = _ex.fetch_activity(_ADDR, limit=2, transport=_rpc_fake)
+    check("second call served from cache", _ncalls["n"] == _before
+          and _out2["cached"] is True)
+    import server as _sv4
+    from fastapi.testclient import TestClient as _TC4
+    _c4 = _TC4(_sv4.app)
+    check("bad address -> 400 from the endpoint",
+          _c4.get("/api/wallet", params={"address": "zz!!"}).status_code == 400)
+    _page = _c4.get("/").text
+    check("frontend carries the wallet audit section",
+          "WALLET_AUDIT" in _page)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
