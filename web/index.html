@@ -188,7 +188,14 @@ $("wgo").onclick=async()=>{
   $("wgo").disabled=false;
 };
 function renderWallet(w){
-  let h=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
+  const sx=w.sanctions||{};
+  let h="";
+  if(sx.listed){
+    h+=`<div class="banner" style="border-color:var(--orange);color:var(--orange);background:rgba(255,77,0,.08)">⚠ SANCTIONED — this address is ${esc(sx.note)} (${esc(sx.source)}). Attribution of a public record, not a character judgment.</div>`;
+  }else{
+    h+=`<div class="mono" style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">screening: ${esc(sx.note||"no public sanctions reports found")} · ${esc(sx.source||"OFAC SDN")} · absence of reports is not an assertion of safety</div>`;
+  }
+  h+=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
     <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div>
     <button class="exec" id="wshare" style="margin-top:8px;width:auto;padding:6px 14px;background:none;border:1px solid var(--info);color:var(--info)">SHARE AUDIT LINK</button>
     <span id="wshareout" style="margin-left:10px"></span></div>`;
@@ -202,6 +209,7 @@ function renderWallet(w){
     h+=`<div class="card ${t.err?"bad":t.veripay?"":"ok"}" style="animation-delay:${i*110}ms;border-left-color:${col};border-top-color:${col}">
       <div class="card-head"><h3>${t.time?new Date(t.time*1000).toLocaleString():"—"}</h3>
         <span class="badge ${t.err?"bad":"ok"}" style="color:${col};border-color:${col}">${t.err?"FAILED":(inb?"IN":"OUT")}</span></div>
+      ${t.counterparty_sanctioned?`<div class="variance" style="margin:0 12px">⚠ COUNTERPARTY SANCTIONED — listed on OFAC SDN; money moved with a listed address</div>`:""}
       <div class="card-body">
         <div class="grid2"><div><span class="caps">Δ balance</span><span class="val" style="color:${col}">${(t.delta/1e9).toFixed(6)} SOL</span></div>
         <div><span class="caps">Counterparty</span><span class="val" style="font-size:11px;word-break:break-all">${esc((t.counterparty||"—").slice(0,12))}…</span></div></div>
