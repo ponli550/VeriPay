@@ -436,7 +436,7 @@ if _has_srv and os.path.exists("sample_report.pdf"):
     _client = TestClient(_srv.app)
     _r = _client.get("/")
     check("serves the frontend at /",
-          _r.status_code == 200 and "FINVERIFY" in _r.text.upper())
+          _r.status_code == 200 and "VERIPAY" in _r.text.upper())
     check("frontend is self-contained (no tailwind CDN)",
           "cdn.tailwindcss.com" not in _r.text)
     check("frontend carries no fabricated tx hashes",

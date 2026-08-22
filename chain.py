@@ -24,6 +24,8 @@ import json
 import os
 
 import httpx
+
+import screening
 from solders.hash import Hash
 from solders.instruction import AccountMeta, Instruction
 from solders.keypair import Keypair
@@ -103,6 +105,23 @@ def notarize(result: dict, keypair: Keypair | None = None, transport=None) -> di
     }
 
 
+def notarize_refusal(result: dict, reason: str,
+                     keypair: Keypair | None = None, transport=None) -> dict:
+    """Negative-result notarization: a refusal is an audit event too.
+    Writes veripay:refused:sha256:<digest> on-chain so 'the agent held
+    the money' is as publicly provable as 'the agent paid'."""
+    kp = keypair or load_keypair()
+    digest = result_digest(result)
+    sig = _send([_memo_ix(kp, f"veripay:refused:sha256:{digest}")],
+                kp, transport)
+    return {
+        "signature": sig,
+        "digest": digest,
+        "reason": reason,
+        "explorer": f"https://explorer.solana.com/tx/{sig}?cluster=devnet",
+    }
+
+
 def pay_if_verified(
     result: dict,
     recipient: str,
@@ -129,6 +148,13 @@ def pay_if_verified(
     if unpinned:
         raise PaymentBlocked(
             f"{len(unpinned)} fact(s) not pinned to source — payment refused"
+        )
+
+    hit = screening.check(recipient)
+    if hit["listed"]:
+        raise PaymentBlocked(
+            f"SANCTIONS_LIST_MATCH — recipient is {hit['note']} "
+            f"({hit['source']}); payment refused"
         )
 
     kp = keypair or load_keypair()

@@ -15,6 +15,8 @@ import time
 import httpx
 from solders.pubkey import Pubkey
 
+import screening
+
 RPC_URLS = {
     "devnet": os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com"),
     "mainnet": "https://api.mainnet-beta.solana.com",
@@ -94,8 +96,11 @@ def fetch_activity(address: str, limit: int = 12, network: str = "devnet",
             row["signature"] = s["signature"]
             txs.append(row)
 
+    for row in txs:
+        row["counterparty_sanctioned"] = (
+            row["counterparty"] in screening.addresses())
     result = {"address": address, "network": network, "txs": txs,
-              "cached": False}
+              "sanctions": screening.check(address), "cached": False}
     _cache[key] = (time.time(), result)
     while len(_cache) > _CACHE_CAP:
         _cache.pop(next(iter(_cache)))
