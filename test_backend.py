@@ -1708,6 +1708,44 @@ for _pat in ('$("exec").onclick', '$("drop").onclick', "function ts()",
     check(f"exactly one {_pat}", _h51.count(_pat) == 1,
           f"count={_h51.count(_pat)}")
 
+
+# ── 52. on-chain reputation from refusals — spec BEFORE code ───────────────
+
+print("\n=== 52. reputation ===")
+import explorer as _ex52
+def _rpc52(method, params):
+    if method == "getSignaturesForAddress":
+        return [{"signature": f"R{i}", "blockTime": i, "err": None} for i in range(4)]
+    sig = params[0]
+    memo = {"R0": 'Program log: Memo (len 9): "veripay:paid:sha256:aa"',
+            "R1": 'Program log: Memo (len 9): "veripay:refused:sha256:bb"',
+            "R2": 'Program log: Memo (len 9): "veripay:sha256:cc"',
+            "R3": 'Program log: hello'}[sig]
+    delta_in = sig in ("R0",)
+    pre = [5, 0] if delta_in else [5, 1]
+    post = [4, 1] if delta_in else [5, 0]
+    return {"blockTime": 1, "meta": {"err": None,
+            "preBalances": pre, "postBalances": post,
+            "logMessages": [memo]},
+            "transaction": {"message": {"accountKeys": [
+                {"pubkey": "OtherParty11111111111111111111111111111111"},
+                {"pubkey": "6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz"}]}}}
+_ex52._cache.clear()
+_w52 = _ex52.fetch_activity("6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz",
+                            limit=4, transport=_rpc52)
+_rep = _w52.get("reputation") or {}
+check("verified payments received counted",
+      _rep.get("paid_received") == 1, str(_rep))
+check("verified payments sent counted", _rep.get("paid_sent") == 1)
+check("notarized refusals counted", _rep.get("refusals") == 1)
+check("audit anchors counted", _rep.get("anchored") == 1)
+check("window is explicit, never implied as lifetime",
+      _rep.get("window") == 4)
+_h52 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+check("UI renders the reputation badge with honest window wording",
+      "REPUTATION" in _h52 and "latest" in _h52
+      and "notarized refusal" in _h52)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
