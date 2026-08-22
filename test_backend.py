@@ -1105,7 +1105,7 @@ _dl = open(os.path.join(os.path.dirname(__file__), "scripts",
 check("live proof notarizes the refusal", "notarize_refusal" in _dl)
 check("refusal leg prints its own explorer line", "REFUSAL-NOTARIZED" in _dl)
 check("refusal notarization happens on the REFUSED path, before the paid leg",
-      _dl.index("notarize_refusal") < _dl.index("clean_invoice.pdf"))
+      _dl.index("notarize_refusal") < _dl.index("pay_if_verified(clean"))
 
 # ── Summary ───────────────────────────────────────────────────────────────
 
