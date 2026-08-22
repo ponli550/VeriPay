@@ -1600,13 +1600,14 @@ check("UI states the rate limit plainly", "rate-limited" in _h47
 
 print("\n=== 48. mobile ===")
 _hm = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
-_mob = _hm[_hm.index("@media (max-width:860px)"):]
-_mob = _mob[:_mob.index("}")+2]
-check("canvas is never hidden on phones", ".right{display:none}" not in _mob.replace(" ",""))
-check("phone layout stacks to one column",
-      "grid-template-columns:1fr" in _mob.replace(" ","") and "overflow:auto" in _mob.replace(" ",""))
+_mob = "".join(_hm[_hm.index("@media (max-width:860px)"):].split())
+_j = _mob.find("@media", 10)
+_mob = _mob[:_j] if _j != -1 else _mob
+check("canvas is never hidden on phones", ".right{display:none}" not in _mob)
+check("phone layout stacks to one scrolling column",
+      "main{grid-template-columns:1fr" in _mob and "overflow:auto" in _mob)
 check("dashboard tiles collapse to a single column on phones",
-      ".dash{grid-template-columns:1fr" in _mob.replace(" ",""))
+      ".dash{grid-template-columns:1fr}" in _mob)
 
 # ── Summary ───────────────────────────────────────────────────────────────
 
