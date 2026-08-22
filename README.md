@@ -17,13 +17,33 @@ Secondary mappings (until full problem statements are revealed):
 - *Sustainability/ESG* — same engine pointed at ESG disclosures; anchored
   digests make restatements detectable. (Weakest fit; not the pitch.)
 
+## Live viewer 🌐
+
+**https://veripay.nazrijz336.workers.dev** — Cloudflare Workers static
+viewer: shared boards open anywhere. The engine + chain layer run on the
+analyst's machine (Workers can't load solders, and shouldn't hold keys).
+
 ## Screenshots
 
 ![Verified pipeline run](docs/screenshots/verified_run.png)
 *Live pipeline: mismatch caught, trend verified, evidenced risks, 6/6 quotes pinned.*
 
 ![Wallet audit](docs/screenshots/wallet_audit.png)
-*Paste-any-address audit: the agent's `veripay:paid` memos decoded straight off public devnet RPC.*
+*Paste-any-address ledger 📒: every agent payment decoded off public RPC,
+OFAC screening with honest wording, fetch cap stated. Scales past 100 tx
+by wrapping, not horizontal scrolling.*
+
+## How the agent decides 💸
+
+```mermaid
+flowchart LR
+    A[🧾 Invoice] --> B[🧮 Deterministic verify]
+    B -->|all checks pass<br/>all quotes pinned| C[💸 PAY<br/>memo: sha256 + audit root]
+    B -->|any failure| D[🛑 REFUSE<br/>notarized on-chain too]
+    C & D --> E[🔎 Publicly auditable<br/>paste any address]
+    E --> F[🚨 OFAC screening<br/>attribution, never accusation]
+```
+
 
 ## Lineage
 
