@@ -104,7 +104,9 @@ async def build_payment(request: Request):
     body = await request.json()
     root = str(body.get("root", ""))
     payer = str(body.get("payer", ""))
-    lamports = int(body.get("lamports", 1000) or 1000)
+    # Rent-safe default: transfers below ~890,880 lamports to a fresh
+    # account fail simulation ("insufficient funds for rent").
+    lamports = int(body.get("lamports", 1_000_000) or 1_000_000)
     result = _released.get(root)
     if result is None:
         return Response("unknown release — this server only builds payments "
