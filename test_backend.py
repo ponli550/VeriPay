@@ -436,7 +436,7 @@ if _has_srv and os.path.exists("sample_report.pdf"):
     _client = TestClient(_srv.app)
     _r = _client.get("/")
     check("serves the frontend at /",
-          _r.status_code == 200 and "FINVERIFY" in _r.text.upper())
+          _r.status_code == 200 and "VERIPAY" in _r.text.upper())
     check("frontend is self-contained (no tailwind CDN)",
           "cdn.tailwindcss.com" not in _r.text)
     check("frontend carries no fabricated tx hashes",
@@ -998,6 +998,103 @@ _page = _c5.get("/").text
 check("frontend auto-runs audit from ?wallet= param",
       "URLSearchParams" in _page and "wallet" in _page)
 check("frontend has a share control", "SHARE" in _page)
+
+
+# ── 28. OFAC sanctions screening — spec BEFORE code ────────────────────────
+
+print("\n=== 28. sanctions screening ===")
+try:
+    import screening as _sc
+    _has_sc = True
+except Exception as _e:
+    _has_sc = False
+    print(f"  (screening import failed: {_e})")
+check("screening module importable", _has_sc)
+if _has_sc:
+    _BAD = "42RLPACwZPx3vYYmxSueqsogfynBDqXK298EDsNoyoHi"  # real OFAC SDN entry
+    _r = _sc.check(_BAD)
+    check("listed address flagged with named source and date",
+          _r["listed"] is True and "OFAC" in _r["source"] and _r["as_of"])
+    _r2 = _sc.check("6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz")
+    check("unlisted address is NOT called safe — wording is non-coverage",
+          _r2["listed"] is False and "safe" not in json.dumps(_r2).lower())
+    check("module never claims 'scammer' — attribution wording only",
+          "scammer" not in open(os.path.join(os.path.dirname(__file__),
+                                             "screening.py")).read().lower())
+    # refresh is injectable and failure falls back to the vendored snapshot
+    _n0 = len(_sc.addresses())
+    _sc.refresh(fetch=lambda: (_ for _ in ()).throw(RuntimeError("net down")))
+    check("refresh failure keeps the vendored snapshot",
+          len(_sc.addresses()) == _n0)
+    _sc.refresh(fetch=lambda: [_BAD, "NewAddr111111111111111111111111111111111111"])
+    check("successful refresh replaces the set", len(_sc.addresses()) == 2)
+    _sc.reload_vendored()
+    # wallet audit surfaces screening for the queried address AND counterparties
+    import explorer as _ex2
+    def _rpc2(method, params):
+        if method == "getSignaturesForAddress":
+            return [{"signature": "S1", "blockTime": 1, "err": None}]
+        return {"blockTime": 1, "meta": {"err": None,
+                "preBalances": [2, 0], "postBalances": [1, 1],
+                "logMessages": []},
+                "transaction": {"message": {"accountKeys": [
+                    {"pubkey": "6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz"},
+                    {"pubkey": _BAD}]}}}
+    _ex2._cache.clear()
+    _w = _ex2.fetch_activity("6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz",
+                             limit=1, transport=_rpc2)
+    check("queried-address screening attached",
+          _w["sanctions"]["listed"] is False)
+    check("sanctioned counterparty raises the red alarm on the tx row",
+          _w["txs"][0]["counterparty_sanctioned"] is True)
+    # the payment gate refuses a sanctioned recipient BEFORE any tx is built
+    import chain as _ch2
+    _clean = {"answer": "x", "error": None, "fallback_used": False,
+              "checks": [{"passed": True, "error": None}],
+              "facts": [{"verified_in_source": True}]}
+    try:
+        _ch2.pay_if_verified(_clean, _BAD, 1000,
+                             keypair=None, transport=lambda **k: {})
+        check("sanctioned recipient refused", False)
+    except _ch2.PaymentBlocked as e:
+        check("sanctioned recipient refused as SANCTIONS_LIST_MATCH",
+              "SANCTIONS_LIST_MATCH" in str(e) and "OFAC" in str(e))
+
+    _page28 = _c4.get("/").text if "_c4" in dir() else __import__("fastapi.testclient", fromlist=["TestClient"]).TestClient(__import__("server").app).get("/").text
+    check("UI renders the sanctions banner wording",
+          "SANCTIONED" in _page28 and "OFAC" in _page28)
+    check("UI flags sanctioned counterparties on tx rows",
+          "counterparty_sanctioned" in _page28)
+    check("UI empty state is non-coverage, never 'safe'",
+          "no public sanctions reports found" in _page28.lower())
+
+# ── 29. refusal notarization — spec BEFORE code ────────────────────────────
+
+print("\n=== 29. refusal notarization ===")
+import chain as _ch3
+check("chain exposes notarize_refusal", hasattr(_ch3, "notarize_refusal"))
+if hasattr(_ch3, "notarize_refusal"):
+    from solders.keypair import Keypair as _KP3
+    from solders.transaction import Transaction as _TX3
+    import base64 as _b643
+    _calls3 = []
+    def _fake3(payload):
+        _calls3.append(payload)
+        if payload["method"] == "getLatestBlockhash":
+            return {"jsonrpc": "2.0", "id": 1, "result":
+                    {"value": {"blockhash": "1" * 32, "lastValidBlockHeight": 1}}}
+        return {"jsonrpc": "2.0", "id": 1, "result": "REFSIG" + "1" * 60}
+    _res3 = {"answer": "x", "checks": [{"passed": False, "error": None}],
+             "facts": [], "fallback_used": False, "error": None}
+    _n = _ch3.notarize_refusal(_res3, "verification failed",
+                               keypair=_KP3(), transport=_fake3)
+    check("refusal memo carries the digest and the reason marker",
+          _n["signature"].startswith("REFSIG"))
+    _sent3 = next(c for c in _calls3 if c["method"] == "sendTransaction")
+    _tx3 = _TX3.from_bytes(_b643.b64decode(_sent3["params"][0]))
+    _memo3 = bytes(_tx3.message.instructions[0].data).decode()
+    check("on-chain memo says refused, with sha256",
+          _memo3.startswith("veripay:refused:sha256:"))
 
 # ── Summary ───────────────────────────────────────────────────────────────
 

@@ -17,6 +17,14 @@ Secondary mappings (until full problem statements are revealed):
 - *Sustainability/ESG* — same engine pointed at ESG disclosures; anchored
   digests make restatements detectable. (Weakest fit; not the pitch.)
 
+## Screenshots
+
+![Verified pipeline run](docs/screenshots/verified_run.png)
+*Live pipeline: mismatch caught, trend verified, evidenced risks, 6/6 quotes pinned.*
+
+![Wallet audit](docs/screenshots/wallet_audit.png)
+*Paste-any-address audit: the agent's `veripay:paid` memos decoded straight off public devnet RPC.*
+
 ## Lineage
 
 The verification engine is [FinVerify](https://github.com/ponli550/DevLeague)
