@@ -1697,6 +1697,17 @@ finally:
         if v is not None:
             os.environ[k] = v
 
+
+# ── 51. no duplicated handlers — regression lock ───────────────────────────
+
+print("\n=== 51. handler uniqueness ===")
+_h51 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+for _pat in ('$("exec").onclick', '$("drop").onclick', "function ts()",
+             "function log(", "function render(r){", "function renderWallet",
+             "function wireShare"):
+    check(f"exactly one {_pat}", _h51.count(_pat) == 1,
+          f"count={_h51.count(_pat)}")
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")

@@ -174,6 +174,12 @@ h2.caps{color:var(--ink-faint);font-size:11px}
     </div>
     <div id="pane-wallet" style="display:none">
 <div class="controls" style="border-top:1px solid var(--line)">
+      <div class="caps" style="color:var(--purple);margin-bottom:8px">PHANTOM</div>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <button class="exec" id="phconnect" style="margin-bottom:0;background:none;border:1px solid var(--purple);color:var(--purple)">CONNECT PHANTOM</button>
+        <button class="exec" id="phverify" style="margin-bottom:0;background:none;border:1px solid var(--info);color:var(--info);display:none">VERIFY OWNERSHIP</button>
+      </div>
+      <div class="mono" id="phstatus" style="font-size:10px;color:var(--ink-faint);margin-bottom:10px">not connected · owner-signed payments need Phantom set to devnet</div>
       <div class="caps" style="color:var(--purple);margin-bottom:8px">WALLET_AUDIT — any address, read-only</div>
       <input class="q" id="waddr" placeholder="paste any Solana address">
       <div style="display:flex;gap:8px">
@@ -206,6 +212,53 @@ h2.caps{color:var(--ink-faint);font-size:11px}
     </div>
   </div>
 </main>
+<script src="vendor/web3.min.js">
+// ── Phantom: connect / events / ownership proof / owner-signed pay ─────────
+let phWallet=null;
+const provider=()=>window.phantom?.solana?.isPhantom?window.phantom.solana:null;
+function phSet(addr){
+  phWallet=addr;
+  $("phstatus").textContent=addr?`connected: ${addr.slice(0,4)}…${addr.slice(-4)} · devnet required for payments`:"not connected · owner-signed payments need Phantom set to devnet";
+  $("phverify").style.display=addr?"":"none";
+  if(addr){$("waddr").value=addr;}
+  const pay=$("phpay");if(pay)pay.style.display=(addr&&lastResult&&lastResult.audit_log_root&&lastResult.summary&&lastResult.summary.checks_failed===0&&!lastResult.fallback_used)?"":"none";
+}
+$("phconnect").onclick=async()=>{
+  const p=provider();
+  if(!p){$("phstatus").textContent="Phantom not detected — install the extension";return;}
+  try{
+    if(phWallet){await p.disconnect();phSet(null);$("phconnect").textContent="CONNECT PHANTOM";return;}
+    const res=await p.connect();
+    phSet(res.publicKey.toString());
+    $("phconnect").textContent="DISCONNECT";
+    p.on("accountChanged",pk=>{phSet(pk?pk.toString():null);if(phWallet)$("wgo").click();});
+    p.on("disconnect",()=>phSet(null));
+  }catch(e){$("phstatus").textContent="connect rejected";}
+};
+$("phverify").onclick=async()=>{
+  const p=provider();if(!p||!phWallet)return;
+  const nonce=`veripay ownership proof ${Date.now()} ${phWallet.slice(0,8)}`;
+  try{
+    const {signature}=await p.signMessage(new TextEncoder().encode(nonce),"utf8");
+    $("phstatus").textContent=`ownership signed ✓ sig ${btoa(String.fromCharCode(...signature.slice(0,9)))}… (signMessage)`;
+  }catch(e){$("phstatus").textContent="signMessage rejected";}
+};
+async function phPay(){
+  const p=provider();if(!p||!phWallet||!lastResult)return;
+  const out=$("phpayout");
+  out.textContent="building gated transaction…";
+  const r=await fetch("/api/build_payment",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({payer:phWallet,root:lastResult.audit_log_root,lamports:1000})});
+  if(!r.ok){out.textContent=`refused: ${await r.text()}`;return;}
+  const j=await r.json();
+  try{
+    const bytes=Uint8Array.from(atob(j.tx),c=>c.charCodeAt(0));
+    const vtx=solanaWeb3.VersionedTransaction.deserialize(bytes);
+    const {signature}=await p.signAndSendTransaction(vtx);
+    out.innerHTML=`paid by YOUR wallet — <a target="_blank" style="color:var(--teal)" href="https://explorer.solana.com/tx/${signature}?cluster=devnet">${signature.slice(0,18)}… ↗</a>`;
+  }catch(e){out.textContent=`Phantom: ${e.message||e} (is Phantom on devnet?)`;}
+}
+</script>
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -322,6 +375,7 @@ $("exec").onclick=async()=>{
   }catch(err){log("system","fail",String(err));}
   $("exec").disabled=false;
   if(result){lastResult=result;render(result);
+    if(typeof phSet==="function"&&phWallet)phSet(phWallet);
     $("shareboard").style.display="";
     $("shareboard").onclick=shareBoard;}
 };
@@ -596,43 +650,6 @@ function renderWallet(w){
   $("canvas").innerHTML=h;wireShare(w);
 }
 fetch("/api/contribution").then(r=>r.status===200?r.json():null).then(j=>{contrib=j;}).catch(()=>{});
-$("drop").onclick=()=>$("file").click();
-$("drop").ondragover=e=>e.preventDefault();
-$("drop").ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])stage(e.dataTransfer.files[0]);};
-$("file").onchange=e=>{if(e.target.files[0])stage(e.target.files[0]);};
-function stage(f){file=f;$("fname").textContent=f.name;$("exec").disabled=false;}
-function ts(){const d=new Date();return`[${d.toTimeString().slice(0,8)}.${String(d.getMilliseconds()).padStart(3,"0")}]`;}
-function log(stage,status,detail,ms){
-  const line=document.createElement("div");
-  const msTag=ms!=null?`<span class="ms">${ms} ms</span>`:"";
-  line.innerHTML=`<span class="t">${ts()}</span> <span class="st-${esc(stage)}">[${esc(stage.toUpperCase())}]</span> <span class="${status==="fail"?"fail":status==="ok"?"ok":""}">${esc(status.toUpperCase())}</span> ${esc(detail||"")}${msTag}`;
-  const cur=$("log").querySelector(".cursor");$("log").insertBefore(line,cur);$("log").scrollTop=$("log").scrollHeight;
-}
-$("exec").onclick=async()=>{
-  if(!file)return;
-  $("exec").disabled=true;
-  $("canvas").innerHTML=`<div class="idle"><div class="big">PIPELINE RUNNING…</div><p>verification gate holds all output until release</p></div>`;
-  $("srcflag").textContent="";
-  const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
-  let result=null;
-  try{
-    const resp=await fetch("/api/analyze",{method:"POST",body:fd});
-    const reader=resp.body.getReader();const dec=new TextDecoder();let buf="";
-    for(;;){
-      const {done,value}=await reader.read();if(done)break;
-      buf+=dec.decode(value,{stream:true});
-      let i;while((i=buf.indexOf("\n"))>=0){
-        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
-        if(!line)continue;
-        const ev=JSON.parse(line);
-        if(ev.status!=="running")log(ev.stage,ev.status,ev.detail,ev.elapsed_ms);
-        if(ev.stage==="release")result=ev.result;
-      }
-    }
-  }catch(err){log("system","fail",String(err));}
-  $("exec").disabled=false;
-  if(result)render(result);
-};
 function wireShare(w){
   const b=document.getElementById("wshare");if(!b)return;
   b.onclick=async()=>{
@@ -653,6 +670,9 @@ function render(r){
   if(r.fallback_used)h+=`<div class="banner">⚠ CACHED — the live model call failed; the demo fallback answered. Verification below still ran for real against these facts.</div>`;
   h+=`<div class="answer"><span class="caps">Analysis</span><div class="body">${esc(r.answer)}</div>`;
   if(r.recommendation)h+=`<div class="rec"><b>RECOMMENDATION »</b> ${esc(r.recommendation)}</div>`;
+  if(r.summary&&r.summary.checks_failed===0&&!r.fallback_used&&r.audit_log_root){
+    h+=`<div style="margin-top:10px"><button class="exec" id="phpay" style="width:auto;padding:8px 16px;display:none" onclick="phPay()">PAY WITH PHANTOM — owner-signed, gate-checked</button> <span class="mono" id="phpayout" style="font-size:11px;color:var(--ink-faint)"></span></div>`;
+  }
   h+=`</div>`;
   h+=`<div class="dash">`;
   ARTIFACT_ORDER.forEach(t=>{
@@ -684,6 +704,52 @@ function setTab(doc){
   $("tab-wallet").style.color=doc?off:on;$("tab-wallet").style.background=doc?"none":"var(--bg-low)";
 }
 if(_qp.get("wallet"))setTab(false);
+
+// ── Phantom: connect / events / ownership proof / owner-signed pay ─────────
+let phWallet=null;
+const provider=()=>window.phantom?.solana?.isPhantom?window.phantom.solana:null;
+function phSet(addr){
+  phWallet=addr;
+  $("phstatus").textContent=addr?`connected: ${addr.slice(0,4)}…${addr.slice(-4)} · devnet required for payments`:"not connected · owner-signed payments need Phantom set to devnet";
+  $("phverify").style.display=addr?"":"none";
+  if(addr){$("waddr").value=addr;}
+  const pay=$("phpay");if(pay)pay.style.display=(addr&&lastResult&&lastResult.audit_log_root&&lastResult.summary&&lastResult.summary.checks_failed===0&&!lastResult.fallback_used)?"":"none";
+}
+$("phconnect").onclick=async()=>{
+  const p=provider();
+  if(!p){$("phstatus").textContent="Phantom not detected — install the extension";return;}
+  try{
+    if(phWallet){await p.disconnect();phSet(null);$("phconnect").textContent="CONNECT PHANTOM";return;}
+    const res=await p.connect();
+    phSet(res.publicKey.toString());
+    $("phconnect").textContent="DISCONNECT";
+    p.on("accountChanged",pk=>{phSet(pk?pk.toString():null);if(phWallet)$("wgo").click();});
+    p.on("disconnect",()=>phSet(null));
+  }catch(e){$("phstatus").textContent="connect rejected";}
+};
+$("phverify").onclick=async()=>{
+  const p=provider();if(!p||!phWallet)return;
+  const nonce=`veripay ownership proof ${Date.now()} ${phWallet.slice(0,8)}`;
+  try{
+    const {signature}=await p.signMessage(new TextEncoder().encode(nonce),"utf8");
+    $("phstatus").textContent=`ownership signed ✓ sig ${btoa(String.fromCharCode(...signature.slice(0,9)))}… (signMessage)`;
+  }catch(e){$("phstatus").textContent="signMessage rejected";}
+};
+async function phPay(){
+  const p=provider();if(!p||!phWallet||!lastResult)return;
+  const out=$("phpayout");
+  out.textContent="building gated transaction…";
+  const r=await fetch("/api/build_payment",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({payer:phWallet,root:lastResult.audit_log_root,lamports:1000})});
+  if(!r.ok){out.textContent=`refused: ${await r.text()}`;return;}
+  const j=await r.json();
+  try{
+    const bytes=Uint8Array.from(atob(j.tx),c=>c.charCodeAt(0));
+    const vtx=solanaWeb3.VersionedTransaction.deserialize(bytes);
+    const {signature}=await p.signAndSendTransaction(vtx);
+    out.innerHTML=`paid by YOUR wallet — <a target="_blank" style="color:var(--teal)" href="https://explorer.solana.com/tx/${signature}?cluster=devnet">${signature.slice(0,18)}… ↗</a>`;
+  }catch(e){out.textContent=`Phantom: ${e.message||e} (is Phantom on devnet?)`;}
+}
 </script>
 </body>
 </html>

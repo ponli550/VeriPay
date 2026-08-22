@@ -15,12 +15,19 @@ import tempfile
 
 from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 import backend
 import explorer
 
 app = FastAPI(title="FinVerify")
 _hata_cached = None
+# Releases THIS process produced, keyed by audit root — the owner-signed
+# payment path only builds transactions for results the server itself
+# verified and released. Ephemeral by design (LRU 20).
+_released: dict = {}
+app.mount("/vendor", StaticFiles(directory=os.path.join(
+    os.path.dirname(__file__), "web", "vendor")), name="vendor")
 
 _WEB = os.path.join(os.path.dirname(__file__), "web", "index.html")
 
@@ -89,6 +96,37 @@ def wallet_activity(address: str, limit: int = 12, network: str = "devnet"):
         return Response(f"RPC error: {e}", status_code=502)
 
 
+@app.post("/api/build_payment")
+async def build_payment(request: Request):
+    """Owner-signed path: build an UNSIGNED, gate-checked transaction for
+    a release this server produced. The connected wallet signs in
+    Phantom; no server key is involved. Engine-less hosts answer 501."""
+    body = await request.json()
+    root = str(body.get("root", ""))
+    payer = str(body.get("payer", ""))
+    lamports = int(body.get("lamports", 1000) or 1000)
+    result = _released.get(root)
+    if result is None:
+        return Response("unknown release — this server only builds payments "
+                        "for results it verified itself", status_code=404)
+    recipient = os.environ.get("VERIPAY_RECIPIENT", "").strip()
+    if not recipient:
+        return Response("VERIPAY_RECIPIENT not configured", status_code=501)
+    try:
+        import chain
+    except Exception:
+        return Response("payment building requires the local engine "
+                        "(chain layer is deliberately not deployed here)",
+                        status_code=501)
+    try:
+        tx = chain.build_user_payment(result, payer, recipient, lamports)
+    except chain.PaymentBlocked as e:
+        return Response(str(e), status_code=409)
+    except Exception as e:
+        return Response(f"build failed: {e}", status_code=502)
+    return {"tx": tx, "recipient": recipient, "lamports": lamports}
+
+
 @app.post("/api/analyze")
 async def analyze(file: UploadFile, question: str = Form(...)):
     suffix = os.path.splitext(file.filename or "")[1].lower() or ".pdf"
@@ -99,6 +137,12 @@ async def analyze(file: UploadFile, question: str = Form(...)):
     def stream():
         try:
             for event in backend.analyze_stream(path, question):
+                if event.get("stage") == "release" and event.get("result"):
+                    root = event["result"].get("audit_log_root")
+                    if root:
+                        _released[root] = event["result"]
+                        while len(_released) > 20:
+                            _released.pop(next(iter(_released)))
                 yield json.dumps(event) + "\n"
         finally:
             # Retention = duration of the request. Nothing to purge later.
