@@ -1541,6 +1541,31 @@ check("engine probed; viewer announces itself; wallet button gated",
       '"/api/analyze"' in _h46 and "405" in _h46 and "viewerMode" in _h46
       and "VIEWER MODE" in _h46 and "renders shared boards" in _h46)
 
+
+# ── 44. canvas scroll + counterparty sanity — spec BEFORE code ─────────────
+
+print("\n=== 44. scroll + counterparty ===")
+_h44 = open(os.path.join(os.path.dirname(__file__), "web",
+                         "index.html")).read()
+check("canvas column can shrink so overflow scroll engages",
+      "min-height:0" in _h44.split(".right{")[1].split("}")[0])
+import explorer as _ex44
+def _rpc44(method, params):
+    if method == "getSignaturesForAddress":
+        return [{"signature": "S9", "blockTime": 9, "err": None}]
+    return {"blockTime": 9, "meta": {"err": None, "preBalances": [5, 0],
+            "postBalances": [4, 1], "logMessages": []},
+            "transaction": {"message": {"accountKeys": [
+                {"pubkey": "GsfWthK4iREYpDWbhEHmEpXRjg1wfi6vsoxNFy4EbqTd"},
+                {"pubkey": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"},
+                {"pubkey": "RealCounterparty1111111111111111111111111111"}]}}}
+_ex44._cache.clear()
+_w44 = _ex44.fetch_activity("GsfWthK4iREYpDWbhEHmEpXRjg1wfi6vsoxNFy4EbqTd",
+                            limit=1, transport=_rpc44)
+check("program ids are never shown as the counterparty",
+      _w44["txs"][0]["counterparty"] == "RealCounterparty1111111111111111111111111111",
+      _w44["txs"][0]["counterparty"])
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
