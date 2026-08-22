@@ -617,6 +617,53 @@ $("wgo").onclick=async()=>{
   }
   $("wgo").disabled=false;
 };
+
+// ── Transaction node graph: audited address centered, one aggregated
+// edge per counterparty (direction, totals, tx count). veripay memos
+// color the edge purple, sanctioned counterparties orange. Draw-in via
+// stroke-dasharray — the honest 2D trick: motion tied to real data,
+// disabled under prefers-reduced-motion.
+function renderTxGraph(w){
+  const txs=(w.txs||[]).filter(t=>t.counterparty);
+  if(txs.length<1)return "";
+  const agg={};  // aggregated per counterparty
+  txs.forEach(t=>{
+    const a=agg[t.counterparty]??(agg[t.counterparty]={totalIn:0,totalOut:0,n:0,veripay:false,sanctioned:false});
+    if(t.delta>0)a.totalIn+=t.delta; else a.totalOut+=-t.delta;
+    a.n++; a.veripay=a.veripay||t.veripay; a.sanctioned=a.sanctioned||t.counterparty_sanctioned;
+  });
+  const cps=Object.entries(agg).slice(0,12);
+  const W=680,H=90+cps.length*0,R=Math.min(240,120+cps.length*10),CX=W/2,CY=Math.max(200,R+60);
+  const Ht=CY*2;
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let edges="",nodes="";
+  cps.forEach(([cp,a],i)=>{
+    const ang=-Math.PI/2 + i*(2*Math.PI/cps.length);
+    const x=CX+R*Math.cos(ang), y=CY+R*Math.sin(ang);
+    const edgeColor=a.sanctioned?"var(--orange)":a.veripay?"var(--purple)":(a.totalIn>=a.totalOut?"var(--teal)":"var(--ink-faint)");
+    const wpx=Math.max(1.5,Math.min(6,Math.log10(1+Math.max(a.totalIn,a.totalOut)/1e6)*2+1.5));
+    const len=Math.hypot(x-CX,y-CY);
+    const dash=reduce?"":`stroke-dasharray="${len}" stroke-dashoffset="${len}"`;
+    const anim=reduce?"":`<animate attributeName="stroke-dashoffset" from="${len}" to="0" dur="0.6s" begin="${i*0.08}s" fill="freeze" class="drawEdge"/>`;
+    edges+=`<line x1="${CX}" y1="${CY}" x2="${x}" y2="${y}" stroke="${edgeColor}" stroke-width="${wpx}" opacity="0.8" ${dash}><title>drawEdge</title>${anim}</line>`;
+    const net=a.totalIn-a.totalOut;
+    nodes+=`<g><circle cx="${x}" cy="${y}" r="14" fill="var(--bg-low)" stroke="${edgeColor}" stroke-width="2">
+      <title>${esc(cp)} — in ${(a.totalIn/1e9).toFixed(4)} SOL · out ${(a.totalOut/1e9).toFixed(4)} SOL · ${a.n} tx${a.sanctioned?" · OFAC-LISTED":""}${a.veripay?" · veripay memo":""}</title></circle>
+      <text x="${x}" y="${y+28}" text-anchor="middle" fill="var(--ink-dim)" font-size="9" font-family="var(--mono)">${esc(cp.slice(0,6))}…</text>
+      <text x="${x}" y="${y+4}" text-anchor="middle" fill="${edgeColor}" font-size="8" font-family="var(--mono)">${net>=0?"+":""}${(net/1e9).toFixed(3)}</text></g>`;
+  });
+  return `<div class="answer" style="margin-bottom:10px;padding:12px 14px">
+    <span class="caps" style="color:var(--ink-faint)">TRANSACTION GRAPH — aggregated per counterparty, within the fetched window (${txs.length} tx)</span>
+    <svg viewBox="0 0 ${W} ${Ht}" style="width:100%;max-width:${W}px;margin-top:8px">
+      ${edges}
+      <circle cx="${CX}" cy="${CY}" r="20" fill="var(--bg-lowest)" stroke="var(--info)" stroke-width="2"/>
+      <text x="${CX}" y="${CY+4}" text-anchor="middle" fill="var(--info)" font-size="9" font-family="var(--mono)">${esc(w.address.slice(0,4))}…</text>
+      ${nodes}
+    </svg>
+    <div class="mono" style="font-size:10px;color:var(--ink-faint)">edge width ~ volume · teal net-in · purple veripay memo · orange OFAC-listed · hover a node for totals</div>
+  </div>`;
+}
+
 function renderWallet(w){
   const sx=w.sanctions||{};
   let h="";
@@ -639,6 +686,7 @@ function renderWallet(w){
       <div class="mono" style="font-size:10px;color:var(--ink-faint);margin-top:4px">derived only from veripay:* memos on-chain in this window — a notarized refusal cannot be faked or deleted; absence of history is not a judgment</div>
     </div>`;
   }
+  h+=renderTxGraph(w);
   h+=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
     <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div>
     <button class="exec" id="wshare" style="margin-top:8px;width:auto;padding:6px 14px;background:none;border:1px solid var(--info);color:var(--info)">SHARE AUDIT LINK</button>

@@ -17,6 +17,24 @@ Secondary mappings (until full problem statements are revealed):
 - *Sustainability/ESG* — same engine pointed at ESG disclosures; anchored
   digests make restatements detectable. (Weakest fit; not the pitch.)
 
+## 20 seconds of it working 🎬
+
+![Live demo](docs/screenshots/demo.gif)
+*Real run, sped up: verified dashboard → wallet audit with the on-chain
+reputation badge and transaction graph. Nothing staged.*
+
+## Phantom 👻 — your key, our gate
+
+Connect Phantom and the payment gate becomes **owner-signed**: the server
+builds an unsigned, verification-gated transaction (only for releases it
+verified itself — keyed by audit root); **your wallet signs and sends**.
+No server key anywhere in the path. Plus `signMessage` ownership proof
+and `accountChanged` auto-audit. Human-verified live on devnet — the
+recipient's reputation badge counts a payment signed by a person.
+
+Requires Chrome/Brave/Firefox with the Phantom extension set to
+**devnet** (Phantom does not support Safari).
+
 ## Live viewer 🌐
 
 **https://veripay.nazrijz336.workers.dev** — Cloudflare Workers static
