@@ -638,6 +638,87 @@ except Exception as _e:
     print(f"  FAIL contribution spec crashed: {_e}")
     FAIL += 1
 
+# ── 23. clean_invoice.pdf — a real document for the paid leg ───────────────
+# Written BEFORE the implementation. The live devnet payment leg must pay
+# against a genuine document that passes verification, not a synthetic
+# hand-built result dict. This spec checks the generated PDF's numbers
+# genuinely sum (parsed straight from the text, never hardcoded), that its
+# PII is present pre-redaction and gone post-redaction, and that
+# devnet_live.py has actually been switched over to it.
+
+print("\n=== 23. clean_invoice.pdf ===")
+import re as _re23
+
+try:
+    import make_clean_invoice as _mci
+
+    _mci.build_pdf("clean_invoice.pdf")
+    check("generator writes clean_invoice.pdf",
+          os.path.exists("clean_invoice.pdf"))
+
+    _pages23 = backend.parse_pdf("clean_invoice.pdf")
+    _full23 = "\n".join(text for _, text in _pages23)
+
+    # Parse the line items genuinely — no hardcoded expected sum.
+    _items23 = [
+        float(m.group(2).replace(",", ""))
+        for m in _re23.finditer(
+            r"^(?!Total)([A-Za-z][A-Za-z ]+?)\s+([\d,]+)\s*$", _full23,
+            _re23.MULTILINE,
+        )
+    ]
+    check("found line items", len(_items23) >= 3, f"got {_items23}")
+
+    _total_m23 = _re23.search(r"Total amount due\s+([\d,]+)\s*$", _full23,
+                              _re23.MULTILINE)
+    check("found stated total", _total_m23 is not None)
+    _total23 = float(_total_m23.group(1).replace(",", ""))
+    check("line items genuinely sum to the stated total",
+          abs(sum(_items23) - _total23) < 0.01,
+          f"{_items23} -> {sum(_items23)} vs {_total23}")
+
+    _prior_m23 = _re23.search(r"Total amount due prior quarter\s+([\d,]+)",
+                              _full23)
+    _growth_m23 = _re23.search(r"Growth vs prior quarter:\s+([\d.]+)%",
+                               _full23)
+    check("found prior-period total", _prior_m23 is not None)
+    check("found stated growth rate", _growth_m23 is not None)
+    if _prior_m23 and _growth_m23:
+        _prior23 = float(_prior_m23.group(1).replace(",", ""))
+        _growth23 = float(_growth_m23.group(1))
+        _computed_growth23 = (_total23 - _prior23) / _prior23 * 100
+        check("stated growth is exactly consistent with the figures",
+              abs(_computed_growth23 - _growth23) < 0.01,
+              f"computed {_computed_growth23} vs stated {_growth23}")
+
+    # PII present pre-redaction.
+    _page1_23 = _pages23[0][1]
+    check("name present pre-redaction", "Siti Binti Hassan" in _page1_23)
+    check("email present pre-redaction",
+          "siti.hassan@meridian.com.my" in _page1_23)
+    check("phone present pre-redaction", "019-8765432" in _page1_23)
+    check("IC present pre-redaction", "900101-14-5678" in _page1_23)
+
+    # PII gone post-redaction.
+    _clean23, _n23 = backend.redact(_page1_23)
+    check("redaction did real work", _n23 > 0)
+    check("name gone post-redaction", "Siti Binti Hassan" not in _clean23)
+    check("email gone post-redaction",
+          "siti.hassan@meridian.com.my" not in _clean23)
+    check("phone gone post-redaction", "019-8765432" not in _clean23)
+    check("IC gone post-redaction", "900101-14-5678" not in _clean23)
+
+    _devnet_src23 = open(
+        os.path.join(os.path.dirname(__file__), "scripts", "devnet_live.py")
+    ).read()
+    check("synthetic result dict marker is gone",
+          '"answer": "verified"' not in _devnet_src23)
+    check("devnet_live.py references clean_invoice.pdf",
+          "clean_invoice.pdf" in _devnet_src23)
+except Exception as _e23:
+    print(f"  FAIL clean_invoice spec crashed: {_e23}")
+    FAIL += 1
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
