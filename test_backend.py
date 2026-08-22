@@ -977,6 +977,28 @@ if _has_ex:
     check("frontend carries the wallet audit section",
           "WALLET_AUDIT" in _page)
 
+
+# ── 27. shareable audit deep-link + QR — spec BEFORE code ──────────────────
+
+print("\n=== 27. share deep-link ===")
+import server as _sv5
+from fastapi.testclient import TestClient as _TC5
+_c5 = _TC5(_sv5.app)
+_r = _c5.get("/api/qr", params={"address": "6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz",
+                                "network": "devnet"})
+check("share QR endpoint returns svg data uri + the deep link",
+      _r.status_code == 200 and _r.json()["qr"].startswith("data:image/svg")
+      and "wallet=6BCbkts1" in _r.json()["url"])
+check("bad address -> 400", _c5.get("/api/qr",
+      params={"address": "zz!!", "network": "devnet"}).status_code == 400)
+check("bad network -> 400", _c5.get("/api/qr",
+      params={"address": "6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz",
+              "network": "zz"}).status_code == 400)
+_page = _c5.get("/").text
+check("frontend auto-runs audit from ?wallet= param",
+      "URLSearchParams" in _page and "wallet" in _page)
+check("frontend has a share control", "SHARE" in _page)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
