@@ -1566,6 +1566,35 @@ check("program ids are never shown as the counterparty",
       _w44["txs"][0]["counterparty"] == "RealCounterparty1111111111111111111111111111",
       _w44["txs"][0]["counterparty"])
 
+
+# ── 47. RPC rate-limit degradation — spec BEFORE code ──────────────────────
+
+print("\n=== 47. 429 degradation ===")
+import explorer as _ex47
+_calls47 = {"n": 0}
+def _rpc47(method, params):
+    if method == "getSignaturesForAddress":
+        return [{"signature": f"S{i}", "blockTime": i, "err": None} for i in range(4)]
+    _calls47["n"] += 1
+    if _calls47["n"] % 2 == 0:
+        raise RuntimeError("{'code': 429, 'message': 'Too many requests'}")
+    return {"blockTime": 1, "meta": {"err": None, "preBalances": [2, 0],
+            "postBalances": [1, 1], "logMessages": []},
+            "transaction": {"message": {"accountKeys": [
+                {"pubkey": "6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz"},
+                {"pubkey": "SomeCounterparty111111111111111111111111111"}]}}}
+_ex47._cache.clear()
+_w47 = _ex47.fetch_activity("6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz",
+                            limit=4, transport=_rpc47)
+check("429s degrade to partial results, never an exception",
+      len(_w47["txs"]) >= 1 and _w47["rate_limited"] is True)
+check("partial results are labeled with requested vs delivered",
+      _w47["requested"] == 4)
+_h47 = open(os.path.join(os.path.dirname(__file__), "web",
+                         "index.html")).read()
+check("UI states the rate limit plainly", "rate-limited" in _h47
+      and "partial" in _h47)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
