@@ -98,6 +98,11 @@ def get_deposit_address(token_symbol: str = "SOL",
     data = request("/wallet/sapi/address/deposit",
                    {"token_symbol": token_symbol, "network_name": network_name},
                    transport=transport)
+    # Live responses nest the payload under "data", sibling to
+    # "is_exist"/"status"; fall back to the top level for anything
+    # (e.g. a test transport) that already hands back a flat dict.
+    payload = data.get("data") if isinstance(data.get("data"), dict) else data
+    data = payload
     return {
         "address": data.get("DepositAddress", ""),
         "network": data.get("Network", network_name),
