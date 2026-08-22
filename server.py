@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 import backend
 
 app = FastAPI(title="FinVerify")
+_hata_cached = None
 
 _WEB = os.path.join(os.path.dirname(__file__), "web", "index.html")
 
@@ -35,12 +36,25 @@ def contribution():
     locally from the real value — no placeholder image, no hotlink. With
     nothing configured the endpoint 204s and the card never renders."""
     address = os.environ.get("VERIPAY_WALLET_ADDRESS", "").strip()
+    source = "env"
+    if not address and os.environ.get("HATA_API_KEY"):
+        # Live read-only fetch of the user's Hata deposit address; cached
+        # for the process lifetime so we sign once, not per page load.
+        global _hata_cached
+        if _hata_cached is None:
+            import hata
+            try:
+                _hata_cached = hata.get_deposit_address("SOL", "Solana")
+            except Exception:
+                _hata_cached = {}
+        address = (_hata_cached or {}).get("address", "")
+        source = "hata"
     if not address:
         return Response(status_code=204)
     import segno
     target = os.environ.get("VERIPAY_WALLET_URL", "").strip() or address
     qr = segno.make(target, error="m").svg_data_uri(scale=4, dark="#e2e2e2", light=None)
-    return {"address": address, "url": target, "qr": qr}
+    return {"address": address, "url": target, "qr": qr, "source": source}
 
 
 @app.post("/api/analyze")

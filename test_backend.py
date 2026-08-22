@@ -819,6 +819,86 @@ except Exception as _e23:
     FAIL += 1
 
 
+
+# ── 25. Hata read-only client (deposit address) — written BEFORE the code ──
+
+print("\n=== 25. Hata read-only client ===")
+try:
+    import hata as _ht
+    _has_ht = True
+except Exception as _e:
+    _has_ht = False
+    print(f"  (hata import failed: {_e})")
+check("hata module importable", _has_ht)
+if _has_ht:
+    import hashlib as _hhl, hmac as _hm
+    # signature: HMAC-SHA256 over the alphabetically-sorted canonical string
+    _qs, _sig = _ht.sign({"token_symbol": "SOL", "network_name": "Solana",
+                          "timestamp": 1730000000}, "s3cret")
+    _keys = [p.split("=")[0] for p in _qs.split("&")]
+    check("params sorted alphabetically", _keys == sorted(_keys), _qs)
+    check("signature is hmac-sha256 of the canonical string",
+          _sig == _hm.new(b"s3cret", _qs.encode(), _hhl.sha256).hexdigest())
+    # read-only enforcement: only allowlisted retrieval paths may be called
+    check("withdrawal endpoints are not even mentioned in the module",
+          "withdrawal" not in open(os.path.join(
+              os.path.dirname(__file__), "hata.py")).read())
+    try:
+        _ht.request("/wallet/sapi/withdrawal/create", {}, transport=lambda **k: {})
+        check("non-allowlisted path refused", False)
+    except _ht.ReadOnlyViolation:
+        check("non-allowlisted path refused", True)
+    # transport capture: headers + body
+    _seen = {}
+    def _cap(url, headers, body):
+        _seen.update(url=url, headers=headers, body=body)
+        return {"DepositAddress": "So1anaAddr", "Network": "Solana",
+                "Symbol": "SOL", "Tag": ""}
+    _old = {k: os.environ.pop(k, None) for k in ("HATA_API_KEY", "HATA_API_SECRET")}
+    os.environ["HATA_API_KEY"] = "kid"
+    os.environ["HATA_API_SECRET"] = "sek"
+    try:
+        _out = _ht.get_deposit_address("SOL", "Solana", transport=_cap)
+        check("deposit address returned", _out["address"] == "So1anaAddr")
+        check("X-API-KEY header carried", _seen["headers"].get("X-API-KEY") == "kid")
+        check("Signature header carried", len(_seen["headers"].get("Signature", "")) == 64)
+        check("timestamp included in body", "timestamp" in _seen["body"])
+        os.environ.pop("HATA_API_KEY")
+        try:
+            _ht.get_deposit_address("SOL", "Solana", transport=_cap)
+            check("missing key raises", False)
+        except Exception as e:
+            check("missing key raises naming HATA_API_KEY", "HATA_API_KEY" in str(e))
+    finally:
+        for k, v in _old.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+    # server integration: hata feeds the contribution card when env address unset
+    import server as _sv3
+    from fastapi.testclient import TestClient as _TC3
+    _c3 = _TC3(_sv3.app)
+    _oa = os.environ.pop("VERIPAY_WALLET_ADDRESS", None)
+    _sv3._hata_cached = None
+    _oldfn = _ht.get_deposit_address
+    _ht.get_deposit_address = lambda *a, **k: {"address": "HataLive123", "network": "Solana"}
+    os.environ["HATA_API_KEY"] = "kid"; os.environ["HATA_API_SECRET"] = "sek"
+    try:
+        _r = _c3.get("/api/contribution")
+        check("hata feeds the card when env address unset",
+              _r.status_code == 200 and _r.json()["address"] == "HataLive123"
+              and _r.json().get("source") == "hata")
+        os.environ["VERIPAY_WALLET_ADDRESS"] = "EnvWins456"
+        _r = _c3.get("/api/contribution")
+        check("explicit env address always wins",
+              _r.json()["address"] == "EnvWins456" and _r.json().get("source") == "env")
+    finally:
+        _ht.get_deposit_address = _oldfn
+        os.environ.pop("VERIPAY_WALLET_ADDRESS", None)
+        os.environ.pop("HATA_API_KEY", None); os.environ.pop("HATA_API_SECRET", None)
+        if _oa is not None:
+            os.environ["VERIPAY_WALLET_ADDRESS"] = _oa
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
