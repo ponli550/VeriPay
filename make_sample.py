@@ -57,6 +57,42 @@ def build_pdf(path: str = "sample_report.pdf") -> None:
     c.save()
 
 
+def build_xlsx(path: str = "sample_report.xlsx") -> None:
+    """Deterministic spreadsheet twin of the PDF: same figures, same
+    planted RM 100,000 discrepancy, same PII — so the XLSX ingestion
+    path exercises identical verification and redaction behaviour."""
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Q3 2025"
+    rows = [
+        ["Nusantara Holdings Berhad", ""],
+        ["Quarterly Financial Report — Q3 2025", ""],
+        ["Prepared by", "Ahmad Bin Ali"],
+        ["Contact", "ahmad.ali@nusantara.com.my"],
+        ["Phone", "012-3456789"],
+        ["IC", "880512-14-5533"],
+        ["Product revenue", "1,200,000"],
+        ["Services revenue", "1,150,000"],
+        ["Licensing revenue", "300,000"],
+        ["Total revenue", "2,750,000"],
+        ["Salaries and wages", "850,000"],
+        ["Marketing and advertising", "420,000"],
+        ["Administrative expenses", "180,000"],
+        ["Total operating expenses", "1,450,000"],
+    ]
+    for r in rows:
+        ws.append(r)
+    ws2 = wb.create_sheet("Prior Quarter")
+    ws2.append(["Total revenue prior quarter", "2,500,000"])
+    ws2.append(["Revenue growth vs prior quarter", "10.0%"])
+    wb.save(path)
+    wb.close()
+
+
 if __name__ == "__main__":
     build_pdf()
     print("Wrote sample_report.pdf")
+    build_xlsx()
+    print("Wrote sample_report.xlsx")

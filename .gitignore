@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 sample_report.pdf
 clean_invoice.pdf
+sample_report.xlsx
