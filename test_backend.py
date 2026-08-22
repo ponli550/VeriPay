@@ -1609,6 +1609,94 @@ check("phone layout stacks to one scrolling column",
 check("dashboard tiles collapse to a single column on phones",
       ".dash{grid-template-columns:1fr}" in _mob)
 
+
+# ── 49. owner-signed payments (Phantom) — spec BEFORE code ─────────────────
+
+print("\n=== 49. owner-signed payments ===")
+import chain as _ch49, base64 as _b6449
+from solders.keypair import Keypair as _KP49
+_user49 = str(_KP49().pubkey())
+_rcpt49 = str(_KP49().pubkey())
+def _fake49(payload):
+    if payload["method"] == "getLatestBlockhash":
+        return {"jsonrpc": "2.0", "id": 1, "result":
+                {"value": {"blockhash": "1" * 32, "lastValidBlockHeight": 1}}}
+    return {"jsonrpc": "2.0", "id": 1, "result": None}
+_ok49 = {"answer": "x", "error": None, "fallback_used": False,
+         "checks": [{"passed": True, "error": None}],
+         "facts": [{"verified_in_source": True}],
+         "audit_log_root": "cd" * 32}
+check("build_user_payment exists", hasattr(_ch49, "build_user_payment"))
+if hasattr(_ch49, "build_user_payment"):
+    _tx49 = _ch49.build_user_payment(_ok49, _user49, _rcpt49, 1000,
+                                     transport=_fake49)
+    _raw49 = _b6449.b64decode(_tx49)
+    check("unsigned: one zeroed signature slot",
+          _raw49[0] == 1 and _raw49[1:65] == b"\x00" * 64)
+    from solders.transaction import VersionedTransaction as _VT49
+    _vt49 = _VT49.from_bytes(_raw49)
+    check("fee payer is the CONNECTED WALLET, not a server key",
+          str(_vt49.message.account_keys[0]) == _user49)
+    check("memo carries digest and audit root",
+          b"veripay:paid:sha256:" in _raw49 and b":log:" in _raw49)
+    _bad49 = {**_ok49, "checks": [{"passed": False, "error": None}]}
+    try:
+        _ch49.build_user_payment(_bad49, _user49, _rcpt49, 1000, transport=_fake49)
+        check("failed checks refuse the build", False)
+    except _ch49.PaymentBlocked:
+        check("failed checks refuse the build", True)
+    try:
+        _ch49.build_user_payment(_ok49, _user49,
+            "42RLPACwZPx3vYYmxSueqsogfynBDqXK298EDsNoyoHi", 1000, transport=_fake49)
+        check("sanctioned recipient refuses the build", False)
+    except _ch49.PaymentBlocked as e:
+        check("sanctioned recipient refuses the build",
+              "SANCTIONS_LIST_MATCH" in str(e))
+
+# ── 50. Phantom wiring in the page — spec BEFORE code ──────────────────────
+
+print("\n=== 50. phantom page wiring ===")
+_h50 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+check("web3 vendored locally, no CDN script",
+      'src="vendor/web3.min.js"' in _h50 and "unpkg.com" not in _h50
+      and "cdn.jsdelivr" not in _h50)
+check("connect button + accountChanged autofill",
+      'id="phconnect"' in _h50 and "accountChanged" in _h50)
+check("ownership proof via signMessage", "signMessage" in _h50
+      and 'id="phverify"' in _h50)
+check("owner-signed pay uses deserialize + signAndSendTransaction",
+      "VersionedTransaction.deserialize" in _h50
+      and "signAndSendTransaction" in _h50 and 'id="phpay"' in _h50)
+check("devnet network guard stated", "Phantom" in _h50 and "devnet" in _h50)
+import server as _sv50
+from fastapi.testclient import TestClient as _TC50
+_c50 = _TC50(_sv50.app)
+check("vendor assets served", _c50.get("/vendor/web3.min.js").status_code == 200)
+_ks50 = {k: os.environ.pop(k, None) for k in ("DEEPSEEK_API_KEY", "deepseek_api")}
+os.environ["DEMO_FALLBACK"] = "1"
+try:
+    _r50 = _c50.post("/api/analyze",
+                     files={"file": ("clean_invoice.pdf",
+                                     open("clean_invoice.pdf", "rb"),
+                                     "application/pdf")},
+                     data={"question": "total?"})
+    _rel50 = json.loads(_r50.text.strip().splitlines()[-1])["result"]
+    _root50 = _rel50["audit_log_root"]
+    _b50 = _c50.post("/api/build_payment",
+                     json={"payer": _user49, "root": _root50, "lamports": 1000})
+    # fallback fixture has a mismatch -> the SERVER must refuse the build
+    check("server refuses to build for an unverified release",
+          _b50.status_code == 409, str(_b50.status_code))
+    _b50g = _c50.post("/api/build_payment",
+                      json={"payer": _user49, "root": "ee" * 32, "lamports": 1000})
+    check("unknown root -> 404 (server only pays what IT released)",
+          _b50g.status_code == 404)
+finally:
+    os.environ.pop("DEMO_FALLBACK", None)
+    for k, v in _ks50.items():
+        if v is not None:
+            os.environ[k] = v
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
