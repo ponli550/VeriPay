@@ -115,6 +115,63 @@ def notarize(result: dict, keypair: Keypair | None = None, transport=None) -> di
     }
 
 
+def _gate(result: dict, recipient: str) -> str:
+    """Shared refusal gate: returns the result digest iff everything
+    verifies; raises PaymentBlocked otherwise. Used by both the server-
+    key path and the owner-signed (Phantom) path — one gate, two payers."""
+    if result.get("error"):
+        raise PaymentBlocked(f"analysis error — payment refused: {result['error']}")
+    if result.get("fallback_used"):
+        raise PaymentBlocked("cached fallback result — payment refused")
+    checks = result.get("checks") or []
+    if not checks:
+        raise PaymentBlocked("no checks ran — unverified invoices are never paid")
+    bad = [c for c in checks if c.get("error") or not c.get("passed")]
+    if bad:
+        raise PaymentBlocked(
+            f"{len(bad)} failed or unverifiable check(s) — payment refused")
+    unpinned = [f for f in result.get("facts") or []
+                if not f.get("verified_in_source")]
+    if unpinned:
+        raise PaymentBlocked(
+            f"{len(unpinned)} fact(s) not pinned to source — payment refused")
+    hit = screening.check(recipient)
+    if hit["listed"]:
+        raise PaymentBlocked(
+            f"SANCTIONS_LIST_MATCH — recipient is {hit['note']} "
+            f"({hit['source']}); payment refused")
+    return result_digest(result)
+
+
+def build_user_payment(result: dict, payer_pubkey: str, recipient: str,
+                       lamports: int, transport=None) -> str:
+    """Owner-signed path: same gate as pay_if_verified, but the CONNECTED
+    WALLET is the fee payer and the transaction leaves here UNSIGNED —
+    base64 of a v0 VersionedTransaction with one zeroed signature slot.
+    Phantom deserializes, the user signs, the user sends. No server key
+    is involved anywhere in this path."""
+    digest = _gate(result, recipient)
+    payer = Pubkey.from_string(payer_pubkey)
+    memo = f"veripay:paid:sha256:{digest}"
+    root = result.get("audit_log_root")
+    if root:
+        memo += f":log:{root}"
+    instructions = [
+        transfer(TransferParams(from_pubkey=payer,
+                                to_pubkey=Pubkey.from_string(recipient),
+                                lamports=lamports)),
+        Instruction(MEMO_PROGRAM_ID, memo.encode(),
+                    [AccountMeta(payer, is_signer=True, is_writable=False)]),
+    ]
+    bh = _rpc("getLatestBlockhash", [{"commitment": "finalized"}], transport)
+    blockhash = Hash.from_string(bh["value"]["blockhash"])
+    from solders.message import MessageV0
+    msg = MessageV0.try_compile(payer, instructions, [], blockhash)
+    # one required signer -> compact-array length 1 + 64 zero bytes
+    unsigned = bytes([1]) + b"\x00" * 64 + bytes(msg)
+    return base64.b64encode(unsigned).decode()
+
+
 def notarize_refusal(result: dict, reason: str,
                      keypair: Keypair | None = None, transport=None) -> dict:
     """Negative-result notarization: a refusal is an audit event too.
@@ -140,35 +197,8 @@ def pay_if_verified(
     transport=None,
 ) -> dict:
     """Pay ONLY a fully verified result. Every refusal names its reason."""
-    if result.get("error"):
-        raise PaymentBlocked(f"analysis error — payment refused: {result['error']}")
-    if result.get("fallback_used"):
-        raise PaymentBlocked("cached fallback result — payment refused")
-    checks = result.get("checks") or []
-    if not checks:
-        raise PaymentBlocked("no checks ran — unverified invoices are never paid")
-    bad = [c for c in checks if c.get("error") or not c.get("passed")]
-    if bad:
-        raise PaymentBlocked(
-            f"{len(bad)} failed or unverifiable check(s) — payment refused"
-        )
-    unpinned = [
-        f for f in result.get("facts") or [] if not f.get("verified_in_source")
-    ]
-    if unpinned:
-        raise PaymentBlocked(
-            f"{len(unpinned)} fact(s) not pinned to source — payment refused"
-        )
-
-    hit = screening.check(recipient)
-    if hit["listed"]:
-        raise PaymentBlocked(
-            f"SANCTIONS_LIST_MATCH — recipient is {hit['note']} "
-            f"({hit['source']}); payment refused"
-        )
-
+    digest = _gate(result, recipient)
     kp = keypair or load_keypair()
-    digest = result_digest(result)
     instructions = [
         transfer(
             TransferParams(
