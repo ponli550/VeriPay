@@ -1107,6 +1107,41 @@ check("refusal leg prints its own explorer line", "REFUSAL-NOTARIZED" in _dl)
 check("refusal notarization happens on the REFUSED path, before the paid leg",
       _dl.index("notarize_refusal") < _dl.index("pay_if_verified(clean"))
 
+
+# ── 31. audit-log root anchored in the notarize memo — spec BEFORE code ────
+
+print("\n=== 31. root anchor ===")
+from solders.keypair import Keypair as _KPr
+from solders.transaction import Transaction as _TXr
+import base64 as _b64r
+_callsr = []
+def _faker(payload):
+    _callsr.append(payload)
+    if payload["method"] == "getLatestBlockhash":
+        return {"jsonrpc": "2.0", "id": 1, "result":
+                {"value": {"blockhash": "1" * 32, "lastValidBlockHeight": 1}}}
+    return {"jsonrpc": "2.0", "id": 1, "result": "ROOTSIG" + "1" * 59}
+_resr = {"answer": "x", "checks": [], "facts": [], "error": None,
+         "fallback_used": False, "audit_log_root": "ab" * 32}
+_nr = chain.notarize(_resr, keypair=_KPr(), transport=_faker) if False else None
+import chain as _chr
+_nr = _chr.notarize(_resr, keypair=_KPr(), transport=_faker)
+_sentr = next(c for c in _callsr if c["method"] == "sendTransaction")
+_txr = _TXr.from_bytes(_b64r.b64decode(_sentr["params"][0]))
+_memor = bytes(_txr.message.instructions[0].data).decode()
+check("memo anchors both digests: result and log root",
+      ":log:" in _memor and ("ab" * 32) in _memor
+      and _memor.startswith("veripay:sha256:"))
+check("result digest excludes the root field itself",
+      _chr.result_digest(_resr) == _chr.result_digest(
+          {k: v for k, v in _resr.items() if k != "audit_log_root"}))
+_callsr.clear()
+_res_no_root = {k: v for k, v in _resr.items() if k != "audit_log_root"}
+_chr.notarize(_res_no_root, keypair=_KPr(), transport=_faker)
+_sentr = next(c for c in _callsr if c["method"] == "sendTransaction")
+_memor2 = bytes(_TXr.from_bytes(_b64r.b64decode(_sentr["params"][0])).message.instructions[0].data).decode()
+check("no root -> memo stays in the original format", ":log:" not in _memor2)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
