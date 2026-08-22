@@ -390,7 +390,8 @@ if hasattr(backend, "analyze_stream") and os.path.exists("sample_report.pdf"):
         stages = [e["stage"] for e in events if e["status"] in ("ok", "fail")]
         check("stages run in CI order",
               stages == ["parse", "redact", "extract",
-                         "verify-math", "verify-citations", "release"],
+                         "verify-math", "verify-citations",
+                         "analyse-patterns", "release"],
               f"got {stages}")
         check("every completed stage is measured",
               all(e.get("elapsed_ms") is not None and e["elapsed_ms"] >= 0
@@ -456,7 +457,8 @@ if _has_srv and os.path.exists("sample_report.pdf"):
         _stages = [e["stage"] for e in _lines if e["status"] in ("ok", "fail")]
         check("NDJSON events in CI order",
               _stages == ["parse", "redact", "extract",
-                          "verify-math", "verify-citations", "release"],
+                          "verify-math", "verify-citations",
+                          "analyse-patterns", "release"],
               f"got {_stages}")
         check("release event carries the answer",
               _lines[-1]["stage"] == "release"

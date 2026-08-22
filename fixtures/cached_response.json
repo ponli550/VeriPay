@@ -42,6 +42,13 @@
       "value": 10.0,
       "page": "Page 2",
       "quote": "Revenue growth vs prior quarter: 10.0%"
+    },
+    {
+      "id": "f7",
+      "claim": "Total operating expenses",
+      "value": 1450000,
+      "page": "Page 1",
+      "quote": "Total operating expenses 1,450,000"
     }
   ],
   "checks": [
@@ -68,6 +75,21 @@
     }
   ],
   "recommendation": "Reconcile the RM 100,000 gap between the stated total revenue (RM 2,750,000) and the sum of its segments (RM 2,650,000) before this report is signed off.",
+  "patterns": [
+    {
+      "kind": "composition",
+      "description": "Product revenue is the largest single share of total revenue.",
+      "operand_fact_ids": ["f1"],
+      "against_fact_id": "f4",
+      "evidence_fact_ids": ["f1", "f4"]
+    },
+    {
+      "kind": "ratio",
+      "description": "Operating expenses as a share of total revenue (opex-to-revenue).",
+      "operand_fact_ids": ["f7", "f4"],
+      "evidence_fact_ids": ["f7", "f4"]
+    }
+  ],
   "risks": [
     {
       "description": "Stated total revenue exceeds the sum of its segments by RM 100,000 — the composition of the headline figure does not reconcile.",
