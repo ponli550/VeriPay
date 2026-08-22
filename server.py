@@ -17,6 +17,7 @@ from fastapi import FastAPI, Form, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
 import backend
+import explorer
 
 app = FastAPI(title="FinVerify")
 _hata_cached = None
@@ -55,6 +56,20 @@ def contribution():
     target = os.environ.get("VERIPAY_WALLET_URL", "").strip() or address
     qr = segno.make(target, error="m").svg_data_uri(scale=4, dark="#e2e2e2", light=None)
     return {"address": address, "url": target, "qr": qr, "source": source}
+
+
+@app.get("/api/wallet")
+def wallet_activity(address: str, limit: int = 12, network: str = "devnet"):
+    """Read-only audit of any address — public chain data, no wallet
+    connection, no keys. The demo moment: paste the recipient of our own
+    live payment and watch the veripay:paid memo decode straight off RPC
+    with zero shared state with this backend."""
+    try:
+        return explorer.fetch_activity(address, limit=limit, network=network)
+    except ValueError as e:
+        return Response(str(e), status_code=400)
+    except Exception as e:
+        return Response(f"RPC error: {e}", status_code=502)
 
 
 @app.post("/api/analyze")
