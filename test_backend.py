@@ -1753,6 +1753,14 @@ check("UI renders the reputation badge with honest window wording",
       "REPUTATION" in _h52 and "latest" in _h52
       and "notarized refusal" in _h52)
 
+
+# ── 53. phantom absence diagnoses the browser — spec BEFORE code ───────────
+
+print("\n=== 53. phantom absence UX ===")
+_h53 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+check("Safari users are told Phantom does not support Safari",
+      "Safari" in _h53 and "phantom.app" in _h53)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")

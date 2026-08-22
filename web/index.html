@@ -225,7 +225,12 @@ function phSet(addr){
 }
 $("phconnect").onclick=async()=>{
   const p=provider();
-  if(!p){$("phstatus").textContent="Phantom not detected — install the extension";return;}
+  if(!p){
+    const safari=/^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+    $("phstatus").textContent=safari
+      ?"Phantom does not support Safari — open this page in Chrome, Brave or Firefox with the Phantom extension (phantom.app), set to devnet"
+      :"Phantom not detected — install the extension from phantom.app, reload, and set it to devnet";
+    return;}
   try{
     if(phWallet){await p.disconnect();phSet(null);$("phconnect").textContent="CONNECT PHANTOM";return;}
     const res=await p.connect();
@@ -728,7 +733,12 @@ function phSet(addr){
 }
 $("phconnect").onclick=async()=>{
   const p=provider();
-  if(!p){$("phstatus").textContent="Phantom not detected — install the extension";return;}
+  if(!p){
+    const safari=/^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+    $("phstatus").textContent=safari
+      ?"Phantom does not support Safari — open this page in Chrome, Brave or Firefox with the Phantom extension (phantom.app), set to devnet"
+      :"Phantom not detected — install the extension from phantom.app, reload, and set it to devnet";
+    return;}
   try{
     if(phWallet){await p.disconnect();phSet(null);$("phconnect").textContent="CONNECT PHANTOM";return;}
     const res=await p.connect();
