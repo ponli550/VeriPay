@@ -1576,7 +1576,7 @@ def _rpc47(method, params):
     if method == "getSignaturesForAddress":
         return [{"signature": f"S{i}", "blockTime": i, "err": None} for i in range(4)]
     _calls47["n"] += 1
-    if _calls47["n"] % 2 == 0:
+    if params[0] == "S2":   # this one 429s on every attempt — retry can't save it
         raise RuntimeError("{'code': 429, 'message': 'Too many requests'}")
     return {"blockTime": 1, "meta": {"err": None, "preBalances": [2, 0],
             "postBalances": [1, 1], "logMessages": []},

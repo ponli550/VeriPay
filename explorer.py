@@ -98,11 +98,27 @@ def fetch_activity(address: str, limit: int = 12, network: str = "devnet",
                 [address, {"limit": max(1, min(limit, 25))}],
                 network, transport) or []
     txs = []
+    rate_limited = False
     for s in sigs:
-        tx = _rpc("getTransaction",
-                  [s["signature"], {"encoding": "jsonParsed",
-                                    "maxSupportedTransactionVersion": 0}],
-                  network, transport)
+        tx = None
+        for attempt in (0, 1):
+            try:
+                tx = _rpc("getTransaction",
+                          [s["signature"], {"encoding": "jsonParsed",
+                                            "maxSupportedTransactionVersion": 0}],
+                          network, transport)
+                break
+            except Exception as e:
+                if "429" in str(e) or "Too many" in str(e):
+                    # Public RPC quota — shared cloud egress IPs trip this
+                    # constantly. Show what we have and say so; a quota is
+                    # a fact to display, never a 502.
+                    if attempt == 0:
+                        time.sleep(0.4)
+                        continue
+                    rate_limited = True
+                    break
+                raise
         row = _parse_tx(tx, address)
         if row is not None:
             row["signature"] = s["signature"]
@@ -112,6 +128,7 @@ def fetch_activity(address: str, limit: int = 12, network: str = "devnet",
         row["counterparty_sanctioned"] = (
             row["counterparty"] in screening.addresses())
     result = {"address": address, "network": network, "txs": txs,
+              "rate_limited": rate_limited, "requested": len(sigs),
               "sanctions": screening.check(address), "cached": False}
     _cache[key] = (time.time(), result)
     while len(_cache) > _CACHE_CAP:
