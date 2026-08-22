@@ -710,6 +710,13 @@ try:
     _c2 = _TC2(_sv2.app)
     _old_addr = os.environ.pop("VERIPAY_WALLET_ADDRESS", None)
     _old_url = os.environ.pop("VERIPAY_WALLET_URL", None)
+    # This spec is about the no-config case; isolate it from any real
+    # HATA_API_KEY/SECRET a developer's .env may have loaded (via
+    # backend.load_dotenv()), otherwise it silently exercises the live
+    # Hata path instead of the 204-hidden path under test.
+    _old_hkey = os.environ.pop("HATA_API_KEY", None)
+    _old_hsec = os.environ.pop("HATA_API_SECRET", None)
+    _sv2._hata_cached = None
     try:
         _r = _c2.get("/api/contribution")
         check("no address configured -> 204, card stays hidden",
@@ -732,6 +739,11 @@ try:
             os.environ["VERIPAY_WALLET_ADDRESS"] = _old_addr
         if _old_url is not None:
             os.environ["VERIPAY_WALLET_URL"] = _old_url
+        if _old_hkey is not None:
+            os.environ["HATA_API_KEY"] = _old_hkey
+        if _old_hsec is not None:
+            os.environ["HATA_API_SECRET"] = _old_hsec
+        _sv2._hata_cached = None
 except Exception as _e:
     print(f"  FAIL contribution spec crashed: {_e}")
     FAIL += 1
