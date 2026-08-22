@@ -7,7 +7,8 @@ Does four things, all real, in order:
   2. notarize the released audit result  -> real Memo tx + explorer link
   3. pay_if_verified on the sample audit -> REFUSED (it contains the
      planted RM 100k mismatch) — the refusal IS the demo
-  4. pay_if_verified on a fully verified result -> real transfer + memo
+  4. analyze() clean_invoice.pdf LIVE (no fallback), then pay_if_verified
+     on that real, fully-verified result -> real transfer + memo
 Prints explorer links; exits non-zero on any failure. No fallbacks here.
 """
 import os, sys, time
@@ -61,10 +62,28 @@ try:
 except chain.PaymentBlocked as e:
     print("REFUSED   :", e)
 
-# 4. a fully verified result -> payment goes through, with the digest memo
-clean = {"answer": "verified", "error": None, "fallback_used": False,
-         "checks": [{"passed": True, "error": None}],
-         "facts": [{"verified_in_source": True}]}
+# 4. a REAL, genuinely clean invoice, analyzed LIVE (no fallback) ->
+#    payment goes through only if it actually passes verification.
+if not os.path.exists("clean_invoice.pdf"):
+    sys.exit("clean_invoice.pdf not found. Run: uv run python make_clean_invoice.py")
+
+os.environ.pop("DEMO_FALLBACK", None)
+clean = backend.analyze(
+    "clean_invoice.pdf",
+    "Does the invoice total match the sum of its line items, and is the "
+    "stated growth rate consistent with the prior period?",
+)
+if clean["error"] is not None:
+    sys.exit(f"clean invoice failed verification: {clean['error']}")
+if not clean["checks"]:
+    sys.exit("clean invoice failed verification: no checks ran")
+bad = [c for c in clean["checks"] if c.get("error") or not c.get("passed")]
+if bad:
+    sys.exit(
+        f"clean invoice failed verification: {len(bad)} failed/unverifiable "
+        "check(s) — payment withheld"
+    )
+
 p = chain.pay_if_verified(clean, recipient, 1_000_000)
 print("PAID      :", confirm(p["signature"]), "|", p["explorer"])
 print("\nLive devnet proof complete. Both signatures are on explorer.solana.com (devnet).")
