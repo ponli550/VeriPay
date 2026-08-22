@@ -58,3 +58,13 @@ No eval. No fabricated output. A cached fallback flags itself and is
 **never paid**. Chain tests run offline against an injected fake RPC
 transport; the live devnet path is exercised manually, and a notarization
 failure renders as a failure — never a placeholder signature.
+
+## Demo deployment (Cloudflare quick tunnel)
+
+```bash
+bash scripts/tunnel.sh   # prints an ephemeral public URL; QR/share links use it automatically
+```
+
+Security: while the tunnel is up, the analyze endpoint is publicly
+reachable (unguessable URL, no auth) — run it for the demo window only
+and kill it immediately after. The URL changes every start, by design.
