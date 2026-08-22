@@ -153,7 +153,8 @@ h2.caps{color:var(--ink-faint);font-size:11px}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=n=>n==null?"n/a":Number(n).toLocaleString("en-US",{maximumFractionDigits:2});
-let file=null;
+let file=null,contrib=null;
+fetch("/api/contribution").then(r=>r.status===200?r.json():null).then(j=>{contrib=j;}).catch(()=>{});
 $("drop").onclick=()=>$("file").click();
 $("drop").ondragover=e=>e.preventDefault();
 $("drop").ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])stage(e.dataTransfer.files[0]);};
@@ -229,7 +230,23 @@ function render(r){
     </div>`;
     if(i<r.checks.length-1)h+=`<div class="arrow" style="animation-delay:${i*140+90}ms">→</div>`;
   });
-  h+=`<div class="arrow" style="animation-delay:${r.checks.length*140}ms">→</div><div class="ghost" style="animation-delay:${r.checks.length*140+90}ms"><span style="font-size:28px;color:var(--line)">+</span><span class="caps" style="color:var(--ink-faint)">AWAITING NEXT PERIOD</span></div></div>`;
+  h+=`<div class="arrow" style="animation-delay:${r.checks.length*140}ms">→</div><div class="ghost" style="animation-delay:${r.checks.length*140+90}ms"><span style="font-size:28px;color:var(--line)">+</span><span class="caps" style="color:var(--ink-faint)">AWAITING NEXT PERIOD</span></div>`;
+  if(contrib){
+    h+=`<div class="arrow" style="animation-delay:${r.checks.length*140+180}ms">→</div>
+    <div class="card" style="width:300px;border-top:1px solid var(--purple);animation-delay:${r.checks.length*140+270}ms">
+      <div class="card-head"><span class="caps" style="color:var(--purple)">CONTRIBUTION_PROTOCOL</span></div>
+      <div class="card-body" style="align-items:center">
+        <img src="${contrib.qr}" alt="contribution QR" style="width:170px;height:170px;border:2px solid var(--purple);background:#000;padding:4px">
+        <div style="width:100%;border:1px solid var(--line);background:var(--bg-low);padding:8px">
+          <span class="caps" style="color:var(--ink-faint);display:block;margin-bottom:4px">DESTINATION_WALLET</span>
+          <div class="mono" style="font-size:11px;word-break:break-all">${esc(contrib.address)}</div>
+        </div>
+        <button class="exec" style="background:none;border:1px solid var(--purple);color:var(--purple)"
+          onclick="navigator.clipboard.writeText('${esc(contrib.address)}').then(()=>{this.textContent='COPIED'})">COPY_ADDRESS</button>
+      </div>
+    </div>`;
+  }
+  h+=`</div>`;
   h+=`<div class="sources"><h2 class="caps">Sources — every number pinned to a verbatim quote</h2><div class="src-grid">`;
   r.facts.forEach((f,j)=>{
     h+=`<div class="src" style="animation-delay:${j*70}ms"><div class="top"><span class="claim">${esc(f.claim)}</span><span class="page">${esc(f.page)}</span></div>
