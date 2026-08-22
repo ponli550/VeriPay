@@ -1027,6 +1027,25 @@ check("registry and gates untouched",
       "const RENDERERS" in _h31 and "renderFallbackTable" in _h31
       and "not in the deterministic chart registry" in _h31)
 
+
+# ── 32. dashboard-grid canvas — spec BEFORE code ───────────────────────────
+
+print("\n=== 32. dashboard canvas ===")
+_h32 = open(os.path.join(os.path.dirname(__file__), "web",
+                         "index.html")).read()
+check("12-column dashboard grid", ".dash{display:grid" in _h32
+      and "repeat(12," in _h32)
+check("KPI stat-tile row rendered from real summary fields",
+      "kpis:" in _h32 and "facts_extracted" in _h32
+      and "stat-tile" in _h32)
+check("deterministic reported-vs-calculated comparison chart",
+      "REPORTED VS CALCULATED" in _h32.upper())
+check("stage-timing tile fed by the real stream events",
+      "STAGE TIMINGS" in _h32.upper() and "lastEvents" in _h32)
+check("tiles flow through the registry, gates intact",
+      "renderArtifact" in _h32 and "renderFallbackTable" in _h32
+      and "const RENDERERS" in _h32)
+
 # ── 20. chain layer — verification-gated payments, written BEFORE the code ─
 
 print("\n=== 20. chain (Solana devnet, offline fake transport) ===")
@@ -1114,6 +1133,7 @@ if _has_ch:
 
 
 
+
 # ── 22. contribution card — real address, real QR, no fabrications ─────────
 # Written BEFORE the implementation.
 
@@ -1161,6 +1181,7 @@ try:
 except Exception as _e:
     print(f"  FAIL contribution spec crashed: {_e}")
     FAIL += 1
+
 
 
 
@@ -1248,6 +1269,7 @@ except Exception as _e23:
 
 
 
+
 # ── 26. wallet audit (paste-any-address, read-only) — spec BEFORE code ─────
 
 print("\n=== 26. wallet audit ===")
@@ -1304,6 +1326,7 @@ if _has_ex:
     _page = _c4.get("/").text
     check("frontend carries the wallet audit section",
           "WALLET_AUDIT" in _page)
+
 
 
 
@@ -1376,6 +1399,7 @@ if _has_sc:
           "no public sanctions reports found" in _page28.lower())
 
 
+
 # ── 29. refusal notarization — spec BEFORE code ────────────────────────────
 
 print("\n=== 29. refusal notarization ===")
@@ -1406,6 +1430,7 @@ if hasattr(_ch3, "notarize_refusal"):
 
 
 
+
 # ── 30. refusal notarization wired into the live proof (#15) — spec first ──
 
 print("\n=== 30. devnet_live refusal wiring ===")
@@ -1415,6 +1440,7 @@ check("live proof notarizes the refusal", "notarize_refusal" in _dl)
 check("refusal leg prints its own explorer line", "REFUSAL-NOTARIZED" in _dl)
 check("refusal notarization happens on the REFUSED path, before the paid leg",
       _dl.index("notarize_refusal") < _dl.index("pay_if_verified(clean"))
+
 
 
 
@@ -1454,6 +1480,7 @@ check("no root -> memo stays in the original format", ":log:" not in _memor2)
 
 
 
+
 # ── 40. left-rail tabs — spec BEFORE code ──────────────────────────────────
 
 print("\n=== 40. left-rail tabs ===")
@@ -1467,6 +1494,20 @@ check("wallet markers survive the retheme",
       and "counterparty_sanctioned" in _h40
       and "no public sanctions reports found" in _h40.lower()
       and "CONTRIBUTION_PROTOCOL" in _h40 and "COPY_ADDRESS" in _h40)
+
+
+
+# ── 42. wallet ledger UX — spec BEFORE code ────────────────────────────────
+
+print("\n=== 42. wallet ledger ===")
+_h42 = open(os.path.join(os.path.dirname(__file__), "web",
+                         "index.html")).read()
+_rw = _h42[_h42.index("function renderWallet"):_h42.index("function wireShare")]
+check("wallet activity is a wrapping ledger grid, not a horizontal strip",
+      'class="ledger"' in _rw and 'class="flow"' not in _rw)
+check("ledger cards flex to the grid", ".ledger .card{width:auto" in _h42)
+check("fetch cap is stated, never implied as completeness",
+      "latest" in _rw.lower() and "25" in _rw)
 
 # ── Summary ───────────────────────────────────────────────────────────────
 
