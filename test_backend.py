@@ -1674,6 +1674,8 @@ _c50 = _TC50(_sv50.app)
 check("vendor assets served", _c50.get("/vendor/web3.min.js").status_code == 200)
 _ks50 = {k: os.environ.pop(k, None) for k in ("DEEPSEEK_API_KEY", "deepseek_api")}
 os.environ["DEMO_FALLBACK"] = "1"
+_oldrcpt50 = os.environ.get("VERIPAY_RECIPIENT")
+os.environ["VERIPAY_RECIPIENT"] = _rcpt49  # hermetic: CI has no .env
 try:
     _r50 = _c50.post("/api/analyze",
                      files={"file": ("clean_invoice.pdf",
@@ -1693,6 +1695,10 @@ try:
           _b50g.status_code == 404)
 finally:
     os.environ.pop("DEMO_FALLBACK", None)
+    if _oldrcpt50 is not None:
+        os.environ["VERIPAY_RECIPIENT"] = _oldrcpt50
+    else:
+        os.environ.pop("VERIPAY_RECIPIENT", None)
     for k, v in _ks50.items():
         if v is not None:
             os.environ[k] = v
