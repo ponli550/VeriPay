@@ -470,6 +470,90 @@ if _has_srv and os.path.exists("sample_report.pdf"):
                 os.environ[k] = v
         os.environ.pop("DEMO_FALLBACK", None)
 
+
+# ── 20. chain layer — verification-gated payments, written BEFORE the code ─
+
+print("\n=== 20. chain (Solana devnet, offline fake transport) ===")
+try:
+    import chain as _ch
+    _has_ch = True
+except Exception as _e:
+    _has_ch = False
+    print(f"  (chain import failed: {_e})")
+check("chain module importable", _has_ch)
+if _has_ch:
+    from solders.keypair import Keypair as _KP
+    from solders.transaction import Transaction as _TX
+    import base64 as _b64
+
+    check("memo program id is the verified v2 address",
+          str(_ch.MEMO_PROGRAM_ID) == "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr")
+
+    _d1 = _ch.result_digest({"a": 1, "b": [2, 3]})
+    _d2 = _ch.result_digest({"b": [2, 3], "a": 1})
+    check("digest is key-order independent", _d1 == _d2 and len(_d1) == 64)
+
+    _calls = []
+    def _fake(payload):
+        _calls.append(payload)
+        if payload["method"] == "getLatestBlockhash":
+            return {"jsonrpc": "2.0", "id": 1, "result":
+                    {"value": {"blockhash": "1" * 32, "lastValidBlockHeight": 1}}}
+        if payload["method"] == "sendTransaction":
+            return {"jsonrpc": "2.0", "id": 1, "result": "FAKESIG" + "1" * 60}
+        return {"jsonrpc": "2.0", "id": 1, "result": None}
+
+    _kp = _KP()
+    _res = {"answer": "x", "checks": [{"passed": True, "error": None}],
+            "facts": [{"verified_in_source": True}],
+            "fallback_used": False, "error": None}
+    _n = _ch.notarize(_res, keypair=_kp, transport=_fake)
+    check("notarize returns signature + digest + explorer link",
+          _n["signature"].startswith("FAKESIG")
+          and _n["digest"] == _ch.result_digest(_res)
+          and "explorer.solana.com" in _n["explorer"])
+    _sent = next(c for c in _calls if c["method"] == "sendTransaction")
+    _tx = _TX.from_bytes(_b64.b64decode(_sent["params"][0]))
+    check("memo instruction carries the digest on-chain",
+          _ch.result_digest(_res).encode() in bytes(_tx.message.instructions[0].data))
+
+    def _blocked(res, needle):
+        try:
+            _ch.pay_if_verified(res, str(_KP().pubkey()), 1000,
+                                keypair=_kp, transport=_fake)
+            return False
+        except _ch.PaymentBlocked as e:
+            return needle in str(e)
+    check("refuses when a check failed",
+          _blocked({**_res, "checks": [{"passed": False, "error": None}]}, "refused"))
+    check("refuses when no checks ran",
+          _blocked({**_res, "checks": []}, "never paid"))
+    check("refuses unpinned facts",
+          _blocked({**_res, "facts": [{"verified_in_source": False}]}, "not pinned"))
+    check("refuses cached fallback results",
+          _blocked({**_res, "fallback_used": True}, "cached"))
+    check("refuses analysis errors",
+          _blocked({**_res, "error": "boom"}, "error"))
+
+    _calls.clear()
+    _pay = _ch.pay_if_verified(_res, str(_KP().pubkey()), 1000,
+                               keypair=_kp, transport=_fake)
+    check("pays a fully verified result", _pay["signature"].startswith("FAKESIG"))
+    _sent = next(c for c in _calls if c["method"] == "sendTransaction")
+    _tx = _TX.from_bytes(_b64.b64decode(_sent["params"][0]))
+    check("payment tx carries transfer + memo (2 instructions)",
+          len(_tx.message.instructions) == 2)
+
+    _old = os.environ.pop("SOLANA_SECRET_KEY", None)
+    try:
+        _ch.load_keypair()
+        check("missing SOLANA_SECRET_KEY raises", False)
+    except Exception as e:
+        check("missing SOLANA_SECRET_KEY raises", "SOLANA_SECRET_KEY" in str(e))
+    finally:
+        if _old is not None:
+            os.environ["SOLANA_SECRET_KEY"] = _old
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
