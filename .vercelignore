@@ -1,0 +1,11 @@
+.venv
+node_modules
+.git
+.github
+docs
+scripts
+*.pdf
+*.xlsx
+.env
+.env.*
+test_backend.py

@@ -1511,6 +1511,26 @@ check("fetch cap is stated, never implied as completeness",
 check("the share button is actually WIRED, not just rendered",
       "wireShare(w)" in _rw)
 
+
+# ── 45. pure-python server path (cloud prod mode) — spec BEFORE code ───────
+
+print("\n=== 45. pure server ===")
+_ex45 = open(os.path.join(os.path.dirname(__file__), "explorer.py")).read()
+_sv45 = open(os.path.join(os.path.dirname(__file__), "server.py")).read()
+check("explorer needs no native solders",
+      "solders" not in _ex45 and "_PUBKEY_RE" in _ex45)
+check("server /api/qr needs no native solders", "solders" not in _sv45)
+check("vercel function wrapper exists",
+      os.path.exists(os.path.join(os.path.dirname(__file__), "api", "index.py")))
+check("vercel.json routes everything to the app",
+      os.path.exists(os.path.join(os.path.dirname(__file__), "vercel.json")))
+import explorer as _ex45m
+try:
+    _ex45m.fetch_activity("not valid!!", transport=lambda m,p: {})
+    check("pure validation still rejects garbage", False)
+except ValueError:
+    check("pure validation still rejects garbage", True)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")

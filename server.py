@@ -64,10 +64,8 @@ def share_qr(request: Request, address: str, network: str = "devnet"):
     open /?wallet=ADDR on the same network as this server, audit runs on
     load. QR is generated locally from the link we build — never from
     arbitrary caller text."""
-    from solders.pubkey import Pubkey
-    try:
-        Pubkey.from_string(address)
-    except Exception:
+    import explorer
+    if not explorer._PUBKEY_RE.fullmatch(address or ""):
         return Response("not a valid Solana address", status_code=400)
     if network not in ("devnet", "mainnet"):
         return Response("unknown network", status_code=400)

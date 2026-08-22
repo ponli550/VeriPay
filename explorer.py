@@ -13,9 +13,13 @@ import re
 import time
 
 import httpx
-from solders.pubkey import Pubkey
 
 import screening
+
+# Pure-python address validation: base58 alphabet, 32-44 chars — the
+# shape of an ed25519 pubkey. Full curve checks live with the signer,
+# which never runs in a cloud deployment.
+_PUBKEY_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 
 RPC_URLS = {
     "devnet": os.environ.get("SOLANA_RPC_URL", "https://api.devnet.solana.com"),
@@ -70,9 +74,7 @@ def _parse_tx(tx, address):
 
 def fetch_activity(address: str, limit: int = 12, network: str = "devnet",
                    transport=None) -> dict:
-    try:
-        Pubkey.from_string(address)
-    except Exception:
+    if not _PUBKEY_RE.fullmatch(address or ""):
         raise ValueError(f"not a valid Solana address: {address[:24]}")
     if network not in RPC_URLS:
         raise ValueError(f"unknown network: {network}")
