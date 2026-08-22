@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VERIPAY // AUDIT_ENGINE</title>
 <!-- Fonts are progressive enhancement: everything falls back to system stacks offline. -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#131313; --bg-lowest:#0e0e0e; --bg-low:#1b1b1b; --bg-mid:#1f1f1f;
-  --ink:#e2e2e2; --ink-dim:#cec2d8; --ink-faint:#978da1;
-  --line:#4c4355;
-  --teal:#14F195; --purple:#9945FF; --orange:#FF4D00; --amber:#f59e0b;
+  --bg:#08090A; --bg-lowest:#050607; --bg-low:#101214; --bg-mid:#15171A;
+  --ink:#e6e8e6; --ink-dim:#c8cdd4; --ink-faint:#8b93a1;
+  --line:#26282c;
+  --teal:#3DDC97; --purple:#A855F7; --orange:#E4572E; --amber:#f59e0b;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-  --sans:'Inter',system-ui,-apple-system,sans-serif;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -26,9 +26,11 @@ header{display:flex;justify-content:space-between;align-items:center;height:56px
 header h1{font-size:18px;font-weight:700;letter-spacing:-.02em}
 header .glyph{color:var(--teal);font-family:var(--mono);font-weight:700;margin-right:10px}
 header .sub{color:var(--ink-faint);font-family:var(--mono);font-size:11px}
-main{flex:1;display:flex;min-height:0}
+main{flex:1;display:grid;grid-template-columns:392px minmax(0,1fr) 336px;min-height:0}
+.aside{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--bg);min-height:0}
+@media (max-width:1100px){main{grid-template-columns:392px minmax(0,1fr)}.aside{display:none}}
 /* left column */
-.left{width:380px;min-width:320px;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--bg)}
+.left{display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--bg);min-height:0;overflow-y:auto}
 .panel-head{padding:10px 16px;border-bottom:1px solid var(--line);background:var(--bg-lowest);display:flex;justify-content:space-between;align-items:center}
 .panel-head .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px rgba(20,241,149,.8);animation:pulse 1.6s infinite}
 @keyframes pulse{50%{opacity:.35}}
@@ -48,6 +50,7 @@ main{flex:1;display:flex;min-height:0}
 .telemetry .ok{color:var(--teal)} .telemetry .fail{color:var(--orange)}
 .telemetry .st-parse{color:var(--teal)} .telemetry .st-redact{color:var(--orange)}
 .telemetry .st-extract{color:var(--purple)} .telemetry .st-verify-math,.telemetry .st-verify-citations{color:var(--teal)}
+.telemetry .st-analyse-patterns{color:var(--purple)}
 .telemetry .ms{color:var(--ink-faint);float:right}
 .cursor{color:var(--teal);animation:pulse 1s infinite}
 /* right column */
@@ -62,6 +65,10 @@ main{flex:1;display:flex;min-height:0}
 .answer .body{font-size:14px;line-height:1.6}
 .rec{border-left:4px solid var(--teal);background:rgba(20,241,149,.06);padding:12px 14px;margin-top:12px;font-size:13px;line-height:1.55}
 .rec b{color:var(--teal)}
+.insights{border:1px solid var(--line);border-left:4px solid var(--purple);background:rgba(153,69,255,.06);padding:14px 16px;margin-bottom:16px}
+.insights .caps{color:var(--purple);margin-bottom:8px;display:block;font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+.insights ul{margin:0;padding-left:18px}
+.insights li{font-size:13px;line-height:1.55;margin:5px 0;color:var(--ink)}
 .flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:8px 0 16px}
 .card{width:380px;flex:none;background:var(--bg-lowest);border:1px solid var(--line);display:flex;flex-direction:column;transition:transform .18s ease,box-shadow .18s ease;transform-style:preserve-3d}
 .card:hover{transform:rotateY(-4deg) translateZ(14px) translateY(-2px)}
@@ -86,6 +93,8 @@ main{flex:1;display:flex;min-height:0}
 .grid2 .val{font-family:var(--mono);font-size:13px;font-weight:500}
 .variance{border:1px dashed rgba(255,77,0,.5);background:rgba(255,77,0,.05);color:var(--orange);font-family:var(--mono);font-size:12.5px;font-weight:700;padding:8px 10px}
 .variance::before{content:"⚠ "}
+.override{margin-top:8px;border:1px solid rgba(153,69,255,.4);background:rgba(153,69,255,.08);color:var(--purple);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:6px}
+.override b{color:var(--teal)}
 .arrow{width:56px;flex:none;display:flex;align-items:center;justify-content:center;color:var(--line);font-family:var(--mono);font-size:18px}
 .ghost{width:380px;flex:none;border:1px dashed rgba(76,67,85,.6);opacity:.45;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:260px;gap:8px}
 .sources{margin-top:8px}
@@ -118,7 +127,11 @@ h2.caps{color:var(--ink-faint);font-size:11px}
 </header>
 <main>
   <div class="left">
-    <div class="controls">
+    <div style="display:flex;border-bottom:1px solid var(--line)">
+      <button id="tab-doc" class="caps" style="flex:1;padding:10px;background:var(--bg-low);color:var(--teal);border:none;border-right:1px solid var(--line);cursor:pointer">DOCUMENT</button>
+      <button id="tab-wallet" class="caps" style="flex:1;padding:10px;background:none;color:var(--ink-faint);border:none;cursor:pointer">WALLET</button>
+    </div>
+    <div id="pane-doc" class="controls">
       <div class="caps" style="color:var(--ink-faint);margin-bottom:10px">Deterministic Pipeline Controls</div>
       <div class="dropzone" id="drop">
         <span class="caps">DROP PDF/XLSX HERE</span>
@@ -132,7 +145,8 @@ h2.caps{color:var(--ink-faint);font-size:11px}
       the analysis and is deleted the moment the pipeline completes. Known limits: bare names
       without title/patronymic/cue, and PII inside scanned images.</p>
     </div>
-    <div class="controls" style="border-top:1px solid var(--line)">
+    <div id="pane-wallet" style="display:none">
+<div class="controls" style="border-top:1px solid var(--line)">
       <div class="caps" style="color:var(--purple);margin-bottom:8px">WALLET_AUDIT — any address, read-only</div>
       <input class="q" id="waddr" placeholder="paste any Solana address">
       <div style="display:flex;gap:8px">
@@ -143,11 +157,7 @@ h2.caps{color:var(--ink-faint);font-size:11px}
         <button class="exec" id="wgo" style="margin-bottom:0">AUDIT WALLET</button>
       </div>
     </div>
-    <div class="panel-head"><span class="caps" style="color:var(--ink-faint)">System Telemetry</span><span class="dot"></span></div>
-    <div class="telemetry" id="log">
-      <div><span class="t">[--:--:--.---]</span> <span class="ok">[SYSTEM]</span> ENGINE_READY — awaiting ingestion</div>
-      <div class="cursor">_</div>
-    </div>
+        </div>
   </div>
   <div class="right">
     <div class="panel-head"><span class="caps" style="color:var(--ink-faint)">EVOLUTION_CANVAS</span><span class="caps" id="srcflag" style="color:var(--ink-faint)"></span></div>
@@ -157,6 +167,13 @@ h2.caps{color:var(--ink-faint);font-size:11px}
         <p>Stage a financial statement in the pipeline controls. Every claim is recomputed
         deterministically and pinned to a verbatim source quote before anything renders here.</p>
       </div>
+    </div>
+  </div>
+  <div class="aside">
+    <div class="panel-head"><span class="caps" style="color:var(--ink-faint)">Pipeline Telemetry</span><span class="dot"></span></div>
+    <div class="telemetry" id="log">
+      <div><span class="t">[--:--:--.---]</span> <span class="ok">[SYSTEM]</span> ENGINE_READY — awaiting ingestion</div>
+      <div class="cursor">_</div>
     </div>
   </div>
 </main>
@@ -173,6 +190,263 @@ if(_qp.get("wallet")){
     if(_qp.get("network"))$("wnet").value=_qp.get("network");
     $("wgo").click();
   });
+}
+$("wgo").onclick=async()=>{
+  const a=$("waddr").value.trim();if(!a)return;
+  $("wgo").disabled=true;
+  $("canvas").innerHTML=`<div class="idle"><div class="big">AUDITING ${esc(a.slice(0,8))}…</div><p>reading public chain data — no keys, no custody</p></div>`;
+  try{
+    const r=await fetch(`/api/wallet?address=${encodeURIComponent(a)}&network=${$("wnet").value}`);
+    if(!r.ok){throw new Error(await r.text());}
+    renderWallet(await r.json());
+  }catch(e){
+    $("canvas").innerHTML=`<div class="idle" style="border-color:var(--orange)"><div class="big" style="color:var(--orange)">AUDIT FAILED</div><p>${esc(e.message)}</p></div>`;
+  }
+  $("wgo").disabled=false;
+};
+function renderWallet(w){
+  const sx=w.sanctions||{};
+  let h="";
+  if(sx.listed){
+    h+=`<div class="banner" style="border-color:var(--orange);color:var(--orange);background:rgba(255,77,0,.08)">⚠ SANCTIONED — this address is ${esc(sx.note)} (${esc(sx.source)}). Attribution of a public record, not a character judgment.</div>`;
+  }else{
+    h+=`<div class="mono" style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">screening: ${esc(sx.note||"no public sanctions reports found")} · ${esc(sx.source||"OFAC SDN")} · absence of reports is not an assertion of safety</div>`;
+  }
+  h+=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
+    <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div>
+    <button class="exec" id="wshare" style="margin-top:8px;width:auto;padding:6px 14px;background:none;border:1px solid var(--info);color:var(--info)">SHARE AUDIT LINK</button>
+    <span id="wshareout" style="margin-left:10px"></span></div>`;
+  if(!w.txs.length){
+    h+=`<div class="idle"><div class="big">NO ACTIVITY</div><p>no transactions found for this address on ${esc(w.network)}</p></div>`;
+    $("canvas").innerHTML=h;wireShare(w);return;
+  }
+  h+=`<h2 class="caps section-gap">Recent activity — ${w.txs.length} transaction(s)</h2><div class="flow">`;
+  w.txs.forEach((t,i)=>{
+    const inb=t.delta>=0, col=t.err?"var(--orange)":(t.veripay?"var(--purple)":inb?"var(--teal)":"var(--ink-dim)");
+    h+=`<div class="card ${t.err?"bad":t.veripay?"":"ok"}" style="animation-delay:${i*110}ms;border-left-color:${col};border-top-color:${col}">
+      <div class="card-head"><h3>${t.time?new Date(t.time*1000).toLocaleString():"—"}</h3>
+        <span class="badge ${t.err?"bad":"ok"}" style="color:${col};border-color:${col}">${t.err?"FAILED":(inb?"IN":"OUT")}</span></div>
+      ${t.counterparty_sanctioned?`<div class="variance" style="margin:0 12px">⚠ COUNTERPARTY SANCTIONED — listed on OFAC SDN; money moved with a listed address</div>`:""}
+      <div class="card-body">
+        <div class="grid2"><div><span class="caps">Δ balance</span><span class="val" style="color:${col}">${(t.delta/1e9).toFixed(6)} SOL</span></div>
+        <div><span class="caps">Counterparty</span><span class="val" style="font-size:11px;word-break:break-all">${esc((t.counterparty||"—").slice(0,12))}…</span></div></div>
+        ${t.memo?`<div class="eq"><span class="caps">${t.veripay?"VERIPAY AUDIT MEMO":"MEMO"}</span><div class="expr" style="font-size:11px;word-break:break-all;color:${t.veripay?"var(--purple)":"var(--ink-dim)"}">${esc(t.memo)}</div></div>`:""}
+        <a class="mono" style="font-size:10px;color:var(--info)" target="_blank"
+           href="https://explorer.solana.com/tx/${esc(t.signature)}?cluster=${w.network==="mainnet"?"mainnet-beta":"devnet"}">${esc(t.signature.slice(0,20))}… ↗</a>
+      </div></div>`;
+    if(i<w.txs.length-1)h+=`<div class="arrow" style="animation-delay:${i*110+80}ms">→</div>`;
+  });
+  h+=`</div>`;
+  $("canvas").innerHTML=h;
+}
+fetch("/api/contribution").then(r=>r.status===200?r.json():null).then(j=>{contrib=j;}).catch(()=>{});
+
+$("drop").onclick=()=>$("file").click();
+$("drop").ondragover=e=>e.preventDefault();
+$("drop").ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])stage(e.dataTransfer.files[0]);};
+$("file").onchange=e=>{if(e.target.files[0])stage(e.target.files[0]);};
+function stage(f){file=f;$("fname").textContent=f.name;$("exec").disabled=false;}
+function ts(){const d=new Date();return`[${d.toTimeString().slice(0,8)}.${String(d.getMilliseconds()).padStart(3,"0")}]`;}
+function log(stage,status,detail,ms){
+  const line=document.createElement("div");
+  const msTag=ms!=null?`<span class="ms">${ms} ms</span>`:"";
+  line.innerHTML=`<span class="t">${ts()}</span> <span class="st-${esc(stage)}">[${esc(stage.toUpperCase())}]</span> <span class="${status==="fail"?"fail":status==="ok"?"ok":""}">${esc(status.toUpperCase())}</span> ${esc(detail||"")}${msTag}`;
+  const cur=$("log").querySelector(".cursor");$("log").insertBefore(line,cur);$("log").scrollTop=$("log").scrollHeight;
+}
+$("exec").onclick=async()=>{
+  if(!file)return;
+  $("exec").disabled=true;
+  $("canvas").innerHTML=`<div class="idle"><div class="big">PIPELINE RUNNING…</div><p>verification gate holds all output until release</p></div>`;
+  $("srcflag").textContent="";
+  const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
+  let result=null;
+  try{
+    const resp=await fetch("/api/analyze",{method:"POST",body:fd});
+    const reader=resp.body.getReader();const dec=new TextDecoder();let buf="";
+    for(;;){
+      const {done,value}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      let i;while((i=buf.indexOf("\n"))>=0){
+        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+        if(!line)continue;
+        const ev=JSON.parse(line);
+        if(ev.status!=="running")log(ev.stage,ev.status,ev.detail,ev.elapsed_ms);
+        if(ev.stage==="release")result=ev.result;
+      }
+    }
+  }catch(err){log("system","fail",String(err));}
+  $("exec").disabled=false;
+  if(result)render(result);
+};
+// ── Renderer registry (cityos pattern): type -> (gate, render). A gate
+// checks SHAPE, not presence — malformed data degrades to a plain table
+// so a renderer can never lie with an empty or broken visual; an
+// unregistered type fails loudly instead of silently vanishing.
+function renderFallbackTable(type,data){
+  let rows="";
+  const items=Array.isArray(data)?data:[data];
+  items.slice(0,20).forEach(it=>{rows+=`<tr><td class="mono" style="padding:6px;border:1px solid var(--line);font-size:11px;word-break:break-all">${esc(JSON.stringify(it))}</td></tr>`;});
+  return `<div class="banner" style="border-color:var(--amber);color:var(--amber);background:rgba(245,158,11,.06)">⚠ ${esc(type)} failed its render gate — raw data shown instead of a broken visual</div><table style="width:100%;border-collapse:collapse;margin-bottom:16px">${rows}</table>`;
+}
+// Deterministic chart kinds. The model names ANY kind; these render
+// natively as inline SVG (dataviz rules: thin marks, 2px gaps, text in
+// ink tokens, one hue); anything else degrades to the data table.
+const CHART_KINDS={
+  bar:{gate:c=>c.points.length>=1,render:c=>{
+    const max=Math.max(...c.points.map(p=>p.value)),W=560,BH=22,G=8;
+    let y=0,rows="";
+    c.points.forEach(p=>{
+      const w=Math.max(2,Math.round((p.value/max)*(W-265)));
+      rows+=`<text x="0" y="${y+15}" fill="var(--ink-dim)" font-size="11" font-family="var(--mono)">${esc(p.label.slice(0,22))}</text>
+        <rect x="150" y="${y+3}" width="${w}" height="${BH-G}" rx="4" fill="var(--teal)"/>
+        <text x="${155+w}" y="${y+15}" fill="var(--ink)" font-size="11" font-family="var(--mono)">${fmt(p.value)}</text>`;
+      y+=BH;
+    });
+    return `<svg viewBox="0 0 ${W} ${y}" style="width:100%;max-width:${W}px">${rows}</svg>`;
+  }},
+  line:{gate:c=>c.points.length>=2,render:c=>{
+    const W=560,H=140,P=28,vs=c.points.map(p=>p.value);
+    const lo=Math.min(...vs),hi=Math.max(...vs),sp=hi-lo||1;
+    const X=i=>P+i*(W-2*P)/(c.points.length-1);
+    const Y=v=>H-P-((v-lo)/sp)*(H-2*P);
+    const path=c.points.map((p,i)=>`${i?"L":"M"}${X(i)},${Y(p.value)}`).join(" ");
+    let dots="";
+    c.points.forEach((p,i)=>{dots+=`<circle cx="${X(i)}" cy="${Y(p.value)}" r="4" fill="var(--teal)"/>
+      <text x="${X(i)}" y="${H-8}" text-anchor="middle" fill="var(--ink-faint)" font-size="10" font-family="var(--mono)">${esc(p.label.slice(0,12))}</text>`;});
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px"><path d="${path}" fill="none" stroke="var(--teal)" stroke-width="2"/>${dots}</svg>`;
+  }},
+  donut:{gate:c=>c.points.length>=2&&c.points.length<=6&&c.points.every(p=>p.value>=0),render:c=>{
+    const R=56,CX=70,CY=70,total=c.points.reduce((s,p)=>s+p.value,0)||1;
+    const cols=["var(--teal)","var(--purple)","var(--info)","var(--amber)","var(--ink-dim)","var(--orange)"];
+    let a0=-Math.PI/2,segs="",legend="";
+    c.points.forEach((p,i)=>{
+      const a1=a0+(p.value/total)*2*Math.PI,large=(a1-a0)>Math.PI?1:0;
+      const x0=CX+R*Math.cos(a0),y0=CY+R*Math.sin(a0),x1=CX+R*Math.cos(a1),y1=CY+R*Math.sin(a1);
+      segs+=`<path d="M${x0},${y0} A${R},${R} 0 ${large} 1 ${x1},${y1}" fill="none" stroke="${cols[i%6]}" stroke-width="20"/>`;
+      legend+=`<div class="mono" style="font-size:11px;color:var(--ink-dim)"><span style="color:${cols[i%6]}">■</span> ${esc(p.label)} — ${fmt(p.value)} (${Math.round(p.value/total*100)}%)</div>`;
+      a0=a1+0.03;
+    });
+    return `<div style="display:flex;gap:18px;align-items:center"><svg viewBox="0 0 140 140" style="width:140px;flex:none">${segs}</svg><div>${legend}</div></div>`;
+  }},
+};
+function renderChart(c){
+  const k=CHART_KINDS[c.kind];
+  const head=`<div class="caps" style="color:var(--ink-faint);margin-bottom:8px">${esc(c.title||c.kind)} <span style="color:var(--purple)">· model-chosen ${esc(c.kind)}, drawn only from verified facts</span></div>`;
+  if(!k)return `<div class="answer" style="margin-bottom:12px;padding:12px 14px">${head}<div class="mono" style="font-size:11px;color:var(--amber);margin-bottom:6px">kind "${esc(c.kind)}" is not in the deterministic chart registry — showing the data instead</div>${renderFallbackTable(c.kind,c.points)}</div>`;
+  if(!k.gate(c))return `<div class="answer" style="margin-bottom:12px;padding:12px 14px">${head}${renderFallbackTable(c.kind,c.points)}</div>`;
+  return `<div class="answer" style="margin-bottom:12px;padding:12px 14px">${head}${k.render(c)}</div>`;
+}
+const RENDERERS={
+  charts:{gate:r=>r.charts==null||Array.isArray(r.charts),render:r=>{
+    if(!r.charts||!r.charts.length)return "";
+    let h=`<h2 class="caps section-gap">Visualizations — the model chose the form, verified facts supply the data</h2>`;
+    r.charts.forEach(c=>{h+=renderChart(c);});
+    return h;
+  }},
+  insights:{gate:r=>r.insights==null||typeof r.insights==="string",render:r=>{let h="";if(r.insights){
+    const items=r.insights.split("\n").map(s=>s.trim()).filter(Boolean);
+    if(items.length){
+      h+=`<div class="insights"><span class="caps">Verified insights — built only from re-checked figures</span><ul>`;
+      items.forEach(it=>{h+=`<li>${esc(it)}</li>`;});
+      h+=`</ul></div>`;
+    }
+  }
+  return h;}},
+  patterns:{gate:r=>r.patterns==null||Array.isArray(r.patterns),render:r=>{let h="";if(r.patterns&&r.patterns.length){
+    h+=`<h2 class="caps section-gap">Patterns — spotted by the model, recomputed in Python</h2>`;
+    const klabel={composition:"Composition",ratio:"Ratio",sign:"Threshold",threshold:"Threshold"};
+    r.patterns.forEach(p=>{
+      const unver=!!p.error;
+      const isFlag=(p.kind==="sign"||p.kind==="threshold");
+      // Neutral relationship -> teal; a confirmed sign/threshold flag is
+      // an ADVERSE finding -> amber warning; unverifiable -> faint.
+      const col=unver?"var(--ink-faint)":(isFlag?"var(--amber)":"var(--teal)");
+      const tag=klabel[p.kind]||"Pattern";
+      const state=unver?"unverifiable":(isFlag?"flag":"confirmed");
+      let figure="";
+      if(!unver){
+        figure=(p.kind==="composition"||p.kind==="ratio")?`${fmt(p.actual)}%`:`${fmt(p.actual)}`;
+      }
+      h+=`<div class="answer" style="border-left-color:${col};margin-bottom:10px;padding:12px 14px">
+        <span class="caps" style="color:${col}">${isFlag&&!unver?"\u{1F6A9} ":""}${esc(tag)} ${state}</span>
+        <div class="body" style="font-size:13px;margin-top:4px">${esc(p.description||"")}</div>
+        ${unver
+          ? `<div class="mono" style="font-size:11px;color:var(--amber);margin-top:6px">${esc(p.error)}</div>`
+          : `<div class="mono" style="font-size:11px;color:${col};margin-top:6px">recomputed in Python: ${esc(figure)} · evidence: ${(p.evidence_fact_ids||[]).map(esc).join(", ")}</div>`}
+      </div>`;
+    });
+  }
+  return h;}},
+  risks:{gate:r=>r.risks==null||Array.isArray(r.risks),render:r=>{let h="";if(r.risks&&r.risks.length){
+    h+=`<h2 class="caps section-gap">Risks — every one cites its evidence</h2>`;
+    r.risks.forEach(k=>{
+      const col=k.severity==="high"?"var(--orange)":k.severity==="medium"?"var(--amber)":"var(--ink-faint)";
+      h+=`<div class="answer" style="border-left-color:${col};margin-bottom:10px;padding:12px 14px">
+        <span class="caps" style="color:${col}">${esc(k.severity)} risk</span>
+        <div class="body" style="font-size:13px;margin-top:4px">${esc(k.description)}</div>
+        <div class="mono" style="font-size:11px;color:var(--ink-faint);margin-top:6px">evidence: ${k.evidence_fact_ids.map(esc).join(", ")}</div>
+      </div>`;
+    });
+  }
+  return h;}},
+  checks:{gate:r=>Array.isArray(r.checks)&&r.summary&&typeof r.summary==="object",render:r=>{let h="";h+=`<h2 class="caps section-gap">Verification flow — ${r.summary.checks_passed} pass / ${r.summary.checks_failed} mismatch · ${r.redaction_count} PII masked</h2>`;
+  h+=`<div class="flow">`;
+  r.checks.forEach((c,i)=>{
+    const cls=c.error?"warn":(c.passed?"ok":"bad");
+    const badge=c.error?"UNVERIFIABLE":(c.passed?"VERIFIED":"DISCREPANCY");
+    h+=`<div class="card ${cls}" style="animation-delay:${i*140}ms">
+      <div class="card-head"><h3>${esc(c.description)}</h3><span class="badge ${cls}">${badge}</span></div>
+      <div class="card-body">
+        <div class="grid2">
+          <div><span class="caps">Reported</span><span class="val" data-n="${c.expected??""}">${fmt(c.expected)}</span></div>
+          <div><span class="caps">Calculated</span><span class="val" data-n="${c.actual??""}" style="color:${cls==="ok"?"var(--teal)":cls==="bad"?"var(--orange)":"var(--ink)"}">${fmt(c.actual)}</span></div>
+        </div>
+        ${c.error?`<div class="variance" style="border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.05);color:var(--amber)">${esc(c.error)}</div>`:""}
+        ${(!c.passed&&!c.error)?`<div class="variance">Δ VARIANCE: ${fmt(c.actual-c.expected)}</div>`:""}
+        ${(c.overridden&&c.expected!=null)?`<div class="override">🛡 model claimed <b>${fmt(c.model_stated)}</b> — ignored; verified against the document's cited <b>${fmt(c.expected)}</b></div>`:""}
+      </div>
+    </div>`;
+    if(i<r.checks.length-1)h+=`<div class="arrow" style="animation-delay:${i*140+90}ms">→</div>`;
+  });
+  h+=`<div class="arrow" style="animation-delay:${r.checks.length*140}ms">→</div><div class="ghost" style="animation-delay:${r.checks.length*140+90}ms"><span style="font-size:28px;color:var(--line)">+</span><span class="caps" style="color:var(--ink-faint)">AWAITING NEXT PERIOD</span></div>`;
+  if(contrib){
+    h+=`<div class="arrow" style="animation-delay:${r.checks.length*140+180}ms">→</div>
+    <div class="card" style="width:300px;border-top:1px solid var(--purple);animation-delay:${r.checks.length*140+270}ms">
+      <div class="card-head"><span class="caps" style="color:var(--purple)">CONTRIBUTION_PROTOCOL</span></div>
+      <div class="card-body" style="align-items:center">
+        <img src="${contrib.qr}" alt="contribution QR" style="width:170px;height:170px;border:2px solid var(--purple);background:#000;padding:4px">
+        <div style="width:100%;border:1px solid var(--line);background:var(--bg-low);padding:8px">
+          <span class="caps" style="color:var(--ink-faint);display:block;margin-bottom:4px">DESTINATION_WALLET</span>
+          <div class="mono" style="font-size:11px;word-break:break-all">${esc(contrib.address)}</div>
+        </div>
+        <button class="exec" style="background:none;border:1px solid var(--purple);color:var(--purple)"
+          onclick="navigator.clipboard.writeText('${esc(contrib.address)}').then(()=>{this.textContent='COPIED'})">COPY_ADDRESS</button>
+      </div>
+    </div>`;
+  }
+  h+=`</div>`;
+  return h;}},
+  sources:{gate:r=>Array.isArray(r.facts),render:r=>{let h="";h+=`<div class="sources"><h2 class="caps">Sources — every number pinned to a verbatim quote</h2><div class="src-grid">`;
+  r.facts.forEach((f,j)=>{
+    h+=`<div class="src" style="animation-delay:${j*70}ms"><div class="top"><span class="claim">${esc(f.claim)}</span><span class="page">${esc(f.page)}</span></div>
+      <div class="val">${fmt(f.value)}</div>
+      <blockquote>${esc(f.quote||"(no quote)")}</blockquote>
+      ${f.verified_in_source?`<div class="pin">✓ quote verbatim in source</div>`:`<div class="flag">⚠ quote NOT found verbatim in source</div>`}
+    </div>`;
+  });
+  h+=`</div></div>`;
+  return h;}},
+};
+const ARTIFACT_ORDER=["insights","charts","patterns","risks","checks","sources"];
+function renderArtifact(type,r){
+  const reg=RENDERERS[type];
+  if(!reg)return `<div class="banner" style="border-color:var(--orange);color:var(--orange)">Unregistered artifact type: ${esc(type)}</div>`;
+  try{
+    if(!reg.gate(r))return renderFallbackTable(type,r[type==="sources"?"facts":type]);
+    return reg.render(r);
+  }catch(e){
+    return renderFallbackTable(type,r[type==="sources"?"facts":type]);
+  }
 }
 $("wgo").onclick=async()=>{
   const a=$("waddr").value.trim();if(!a)return;
@@ -269,61 +543,7 @@ function render(r){
   h+=`<div class="answer"><span class="caps">Analysis</span><div class="body">${esc(r.answer)}</div>`;
   if(r.recommendation)h+=`<div class="rec"><b>RECOMMENDATION »</b> ${esc(r.recommendation)}</div>`;
   h+=`</div>`;
-  if(r.risks&&r.risks.length){
-    h+=`<h2 class="caps section-gap">Risks — every one cites its evidence</h2>`;
-    r.risks.forEach(k=>{
-      const col=k.severity==="high"?"var(--orange)":k.severity==="medium"?"var(--amber)":"var(--ink-faint)";
-      h+=`<div class="answer" style="border-left-color:${col};margin-bottom:10px;padding:12px 14px">
-        <span class="caps" style="color:${col}">${esc(k.severity)} risk</span>
-        <div class="body" style="font-size:13px;margin-top:4px">${esc(k.description)}</div>
-        <div class="mono" style="font-size:11px;color:var(--ink-faint);margin-top:6px">evidence: ${k.evidence_fact_ids.map(esc).join(", ")}</div>
-      </div>`;
-    });
-  }
-  h+=`<h2 class="caps section-gap">Verification flow — ${r.summary.checks_passed} pass / ${r.summary.checks_failed} mismatch · ${r.redaction_count} PII masked</h2>`;
-  h+=`<div class="flow">`;
-  r.checks.forEach((c,i)=>{
-    const cls=c.error?"warn":(c.passed?"ok":"bad");
-    const badge=c.error?"UNVERIFIABLE":(c.passed?"VERIFIED":"DISCREPANCY");
-    h+=`<div class="card ${cls}" style="animation-delay:${i*140}ms">
-      <div class="card-head"><h3>${esc(c.description)}</h3><span class="badge ${cls}">${badge}</span></div>
-      <div class="card-body">
-        <div class="grid2">
-          <div><span class="caps">Reported</span><span class="val" data-n="${c.expected??""}">${fmt(c.expected)}</span></div>
-          <div><span class="caps">Calculated</span><span class="val" data-n="${c.actual??""}" style="color:${cls==="ok"?"var(--teal)":cls==="bad"?"var(--orange)":"var(--ink)"}">${fmt(c.actual)}</span></div>
-        </div>
-        ${c.error?`<div class="variance" style="border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.05);color:var(--amber)">${esc(c.error)}</div>`:""}
-        ${(!c.passed&&!c.error)?`<div class="variance">Δ VARIANCE: ${fmt(c.actual-c.expected)}</div>`:""}
-      </div>
-    </div>`;
-    if(i<r.checks.length-1)h+=`<div class="arrow" style="animation-delay:${i*140+90}ms">→</div>`;
-  });
-  h+=`<div class="arrow" style="animation-delay:${r.checks.length*140}ms">→</div><div class="ghost" style="animation-delay:${r.checks.length*140+90}ms"><span style="font-size:28px;color:var(--line)">+</span><span class="caps" style="color:var(--ink-faint)">AWAITING NEXT PERIOD</span></div>`;
-  if(contrib){
-    h+=`<div class="arrow" style="animation-delay:${r.checks.length*140+180}ms">→</div>
-    <div class="card" style="width:300px;border-top:1px solid var(--purple);animation-delay:${r.checks.length*140+270}ms">
-      <div class="card-head"><span class="caps" style="color:var(--purple)">CONTRIBUTION_PROTOCOL</span></div>
-      <div class="card-body" style="align-items:center">
-        <img src="${contrib.qr}" alt="contribution QR" style="width:170px;height:170px;border:2px solid var(--purple);background:#000;padding:4px">
-        <div style="width:100%;border:1px solid var(--line);background:var(--bg-low);padding:8px">
-          <span class="caps" style="color:var(--ink-faint);display:block;margin-bottom:4px">DESTINATION_WALLET</span>
-          <div class="mono" style="font-size:11px;word-break:break-all">${esc(contrib.address)}</div>
-        </div>
-        <button class="exec" style="background:none;border:1px solid var(--purple);color:var(--purple)"
-          onclick="navigator.clipboard.writeText('${esc(contrib.address)}').then(()=>{this.textContent='COPIED'})">COPY_ADDRESS</button>
-      </div>
-    </div>`;
-  }
-  h+=`</div>`;
-  h+=`<div class="sources"><h2 class="caps">Sources — every number pinned to a verbatim quote</h2><div class="src-grid">`;
-  r.facts.forEach((f,j)=>{
-    h+=`<div class="src" style="animation-delay:${j*70}ms"><div class="top"><span class="claim">${esc(f.claim)}</span><span class="page">${esc(f.page)}</span></div>
-      <div class="val">${fmt(f.value)}</div>
-      <blockquote>${esc(f.quote||"(no quote)")}</blockquote>
-      ${f.verified_in_source?`<div class="pin">✓ quote verbatim in source</div>`:`<div class="flag">⚠ quote NOT found verbatim in source</div>`}
-    </div>`;
-  });
-  h+=`</div></div>`;
+  ARTIFACT_ORDER.forEach(t=>{h+=renderArtifact(t,r);});
   $("canvas").innerHTML=h;
   if(!matchMedia("(prefers-reduced-motion: reduce)").matches){
     document.querySelectorAll("#canvas .val[data-n]").forEach(el=>{
@@ -336,6 +556,17 @@ function render(r){
     });
   }
 }
+
+$("tab-doc").onclick=()=>{setTab(true)};
+$("tab-wallet").onclick=()=>{setTab(false)};
+function setTab(doc){
+  document.getElementById("pane-doc").style.display=doc?"":"none";
+  document.getElementById("pane-wallet").style.display=doc?"none":"";
+  const on="var(--teal)",off="var(--ink-faint)";
+  $("tab-doc").style.color=doc?on:off;$("tab-doc").style.background=doc?"var(--bg-low)":"none";
+  $("tab-wallet").style.color=doc?off:on;$("tab-wallet").style.background=doc?"none":"var(--bg-low)";
+}
+if(_qp.get("wallet"))setTab(false);
 </script>
 </body>
 </html>

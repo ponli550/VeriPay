@@ -187,6 +187,10 @@ Schema:
     {"id": "f1", "claim": "short label", "value": 1200000,
      "page": "Page 1", "quote": "the exact line copied from the document"}
   ],
+  "charts": [
+    {"kind": "any visualization kind you judge best", "title": "short title",
+     "points": [{"fact_id": "f1", "label": "optional override"}]}
+  ],
   "risks": [
     {"description": "the risk in plain language", "severity": "low|medium|high",
      "evidence_fact_ids": ["f1", "f4"]}
@@ -216,6 +220,10 @@ Rules:
 - Whenever your answer relies on arithmetic, add a check for it. If the
   document states a total, ALWAYS add a check comparing it to the sum of
   its line items.
+- In "charts", propose whichever visualization best reveals the data —
+  any kind you like (bar, line, donut, waterfall, anything). Be
+  inventive. But points may ONLY reference fact ids from "facts";
+  invented numbers are discarded, and only verified facts are drawn.
 - List trends, exceptions, and potential risks in "risks". Every risk MUST
   cite evidence_fact_ids pointing at entries in "facts" — a risk with no
   evidence will be discarded.
@@ -851,6 +859,7 @@ def _analyze_events(file_path: str, question: str):
         t0 = _time.perf_counter()
         for f in result["facts"]:
             f["verified_in_source"] = _fact_in_source(f, redacted)
+        result["charts"] = _clean_charts(raw.get("charts"), result["facts"])
         hits = sum(1 for f in result["facts"] if f["verified_in_source"])
         ms = int((_time.perf_counter() - t0) * 1000)
         yield {"stage": "verify-citations", "status": "ok",
@@ -901,6 +910,7 @@ def _empty_result() -> dict:
         "answer": "",
         "recommendation": "",
         "insights": "",
+        "charts": [],
         "risks": [],
         "patterns": [],
         "facts": [],
@@ -912,6 +922,39 @@ def _empty_result() -> dict:
                     "checks_passed": 0, "checks_failed": 0},
         "error": None,
     }
+
+
+def _clean_charts(charts, facts) -> list[dict]:
+    """The model may pick ANY kind — creativity is welcome — but every
+    point must resolve to a known, numeric, quote-pinned fact. Points
+    that don't are dropped; a chart with no surviving points is dropped.
+    Kind is passed through untouched: the UI's deterministic registry
+    decides whether it renders or degrades to the data table."""
+    by_id = {str(f.get("id")): f for f in facts or []
+             if isinstance(f, dict)}
+    out = []
+    for c in charts or []:
+        if not isinstance(c, dict):
+            continue
+        points = []
+        ok = True
+        for p in c.get("points") or []:
+            if not isinstance(p, dict):
+                ok = False
+                break
+            f = by_id.get(str(p.get("fact_id")))
+            if (not f or f.get("value") is None
+                    or not f.get("verified_in_source")):
+                ok = False
+                break
+            points.append({"fact_id": str(p["fact_id"]),
+                           "label": str(p.get("label") or f.get("claim", "")),
+                           "value": float(f["value"])})
+        if ok and points:
+            out.append({"kind": str(c.get("kind", "")).strip().lower(),
+                        "title": str(c.get("title", "")).strip(),
+                        "points": points})
+    return out
 
 
 def _clean_risks(risks, facts) -> list[dict]:

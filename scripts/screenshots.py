@@ -21,7 +21,11 @@ try:
     out = os.path.join("docs", "screenshots")
     with sync_playwright() as p:
         page = p.chromium.launch(channel="chrome").new_page(
-            viewport={"width": 1600, "height": 1000})
+            viewport={"width": 1600, "height": 1000},
+            reduced_motion="reduce")  # deterministic captures: the page
+                                      # honors prefers-reduced-motion, so
+                                      # full-page stitching can't race the
+                                      # entrance animations
         page.goto("http://127.0.0.1:7871/")
         page.wait_for_timeout(800)
         page.screenshot(path=f"{out}/idle.png")
@@ -33,6 +37,7 @@ try:
         print("captured: idle.png, verified_run.png")
 
         if os.environ.get("SHOT_WALLET"):  # VeriPay only
+            page.click("#tab-wallet")
             page.fill("#waddr", os.environ["SHOT_WALLET"])
             page.click("#wgo")
             page.wait_for_selector(".flow .card", timeout=30000)
