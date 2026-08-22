@@ -1508,6 +1508,8 @@ check("wallet activity is a wrapping ledger grid, not a horizontal strip",
 check("ledger cards flex to the grid", ".ledger .card{width:auto" in _h42)
 check("fetch cap is stated, never implied as completeness",
       "latest" in _rw.lower() and "25" in _rw)
+check("the share button is actually WIRED, not just rendered",
+      "wireShare(w)" in _rw)
 
 # ── Summary ───────────────────────────────────────────────────────────────
 
