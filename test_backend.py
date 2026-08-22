@@ -1761,6 +1761,22 @@ _h53 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
 check("Safari users are told Phantom does not support Safari",
       "Safari" in _h53 and "phantom.app" in _h53)
 
+
+# ── 54. transaction node graph — spec BEFORE code ──────────────────────────
+
+print("\n=== 54. tx node graph ===")
+_h54 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+check("graph renderer exists and is invoked from the wallet view",
+      "function renderTxGraph" in _h54 and "renderTxGraph(w)" in _h54)
+check("edges aggregate per counterparty with direction and totals",
+      "aggregated" in _h54 and "totalIn" in _h54 and "totalOut" in _h54)
+check("veripay and sanctioned counterparties visually distinct",
+      "edgeColor" in _h54)
+check("2D draw-in trick, motion-safe",
+      "stroke-dasharray" in _h54 and "drawEdge" in _h54)
+check("graph is honest about scope",
+      "within the fetched window" in _h54)
+
 # ── Summary ───────────────────────────────────────────────────────────────
 
 print(f"\n{'='*50}")
