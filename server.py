@@ -13,7 +13,7 @@ import json
 import os
 import tempfile
 
-from fastapi import FastAPI, Form, UploadFile
+from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
 import backend
@@ -58,6 +58,25 @@ def contribution():
     return {"address": address, "url": target, "qr": qr, "source": source}
 
 
+@app.get("/api/qr")
+def share_qr(request: Request, address: str, network: str = "devnet"):
+    """Deep link + QR for a wallet audit, so the view is shareable: scan,
+    open /?wallet=ADDR on the same network as this server, audit runs on
+    load. QR is generated locally from the link we build — never from
+    arbitrary caller text."""
+    from solders.pubkey import Pubkey
+    try:
+        Pubkey.from_string(address)
+    except Exception:
+        return Response("not a valid Solana address", status_code=400)
+    if network not in ("devnet", "mainnet"):
+        return Response("unknown network", status_code=400)
+    import segno
+    url = f"{request.base_url}?wallet={address}&network={network}"
+    qr = segno.make(url, error="m").svg_data_uri(scale=4, dark="#e2e2e2", light=None)
+    return {"url": url, "qr": qr}
+
+
 @app.get("/api/wallet")
 def wallet_activity(address: str, limit: int = 12, network: str = "devnet"):
     """Read-only audit of any address — public chain data, no wallet
@@ -95,4 +114,4 @@ async def analyze(file: UploadFile, question: str = Form(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=7861)
+    uvicorn.run(app, host=os.environ.get("VERIPAY_HOST", "127.0.0.1"), port=7861)

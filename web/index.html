@@ -165,6 +165,15 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=n=>n==null?"n/a":Number(n).toLocaleString("en-US",{maximumFractionDigits:2});
 let file=null,contrib=null;
+// shareable deep link: /?wallet=ADDR&network=devnet auto-runs the audit
+const _qp=new URLSearchParams(location.search);
+if(_qp.get("wallet")){
+  addEventListener("DOMContentLoaded",()=>{
+    $("waddr").value=_qp.get("wallet");
+    if(_qp.get("network"))$("wnet").value=_qp.get("network");
+    $("wgo").click();
+  });
+}
 $("wgo").onclick=async()=>{
   const a=$("waddr").value.trim();if(!a)return;
   $("wgo").disabled=true;
@@ -180,10 +189,12 @@ $("wgo").onclick=async()=>{
 };
 function renderWallet(w){
   let h=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
-    <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div></div>`;
+    <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div>
+    <button class="exec" id="wshare" style="margin-top:8px;width:auto;padding:6px 14px;background:none;border:1px solid var(--info);color:var(--info)">SHARE AUDIT LINK</button>
+    <span id="wshareout" style="margin-left:10px"></span></div>`;
   if(!w.txs.length){
     h+=`<div class="idle"><div class="big">NO ACTIVITY</div><p>no transactions found for this address on ${esc(w.network)}</p></div>`;
-    $("canvas").innerHTML=h;return;
+    $("canvas").innerHTML=h;wireShare(w);return;
   }
   h+=`<h2 class="caps section-gap">Recent activity — ${w.txs.length} transaction(s)</h2><div class="flow">`;
   w.txs.forEach((t,i)=>{
