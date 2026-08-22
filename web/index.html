@@ -132,7 +132,19 @@ h2.caps{color:var(--ink-faint);font-size:11px}
   .flow .arrow{transform-origin:left;animation:drawIn .3s ease both}
   .src{animation:cardIn .4s ease both}
 }
-@media (max-width:860px){.left{width:100%;min-width:0}.right{display:none}}
+@media (max-width:860px){
+  body{height:auto;overflow:auto}
+  main{grid-template-columns:1fr;overflow:auto}
+  .left{width:100%;min-width:0;border-right:none;border-bottom:1px solid var(--line);overflow-y:visible}
+  .right{min-height:60vh}
+  .canvas-wrap{overflow:visible;perspective:none}
+  .aside{display:none}
+  .dash{grid-template-columns:1fr}
+  .t4,.t6,.t8,.t12{grid-column:span 1}
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+  .ledger{grid-template-columns:1fr}
+  header .sub{display:none}
+}
 </style>
 </head>
 <body>
