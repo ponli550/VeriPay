@@ -857,8 +857,11 @@ if _has_ht:
     _seen = {}
     def _cap(url, headers, body):
         _seen.update(url=url, headers=headers, body=body)
-        return {"DepositAddress": "So1anaAddr", "Network": "Solana",
-                "Symbol": "SOL", "Tag": ""}
+        # Real shape confirmed live 2026-08-22: payload is nested under
+        # "data", sibling to "is_exist"/"status" — not top-level fields.
+        return {"data": {"DepositAddress": "So1anaAddr", "Network": "Solana",
+                          "Symbol": "SOL", "Tag": ""},
+                "is_exist": True, "status": "success"}
     _old = {k: os.environ.pop(k, None) for k in ("HATA_API_KEY", "HATA_API_SECRET")}
     os.environ["HATA_API_KEY"] = "kid"
     os.environ["HATA_API_SECRET"] = "sek"
