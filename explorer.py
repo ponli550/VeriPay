@@ -26,6 +26,15 @@ RPC_URLS = {
     "mainnet": "https://api.mainnet-beta.solana.com",
 }
 
+# Program accounts are infrastructure, not counterparties — a memo-only
+# tx would otherwise show the Memo program as "who the money moved with".
+KNOWN_PROGRAM_IDS = frozenset({
+    "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",   # Memo v2
+    "11111111111111111111111111111111",                # System program
+    "ComputeBudget111111111111111111111111111111",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+})
+
 _MEMO_RE = re.compile(r'Memo \(len \d+\): "(.*)"')
 _CACHE_TTL = 60
 _CACHE_CAP = 50
@@ -61,7 +70,8 @@ def _parse_tx(tx, address):
         if m:
             memo = m.group(1)
             break
-    counterparty = next((k for k in keys if k and k != address), "")
+    counterparty = next((k for k in keys if k and k != address
+                     and k not in KNOWN_PROGRAM_IDS), "")
     return {
         "time": tx.get("blockTime"),
         "delta": delta,
