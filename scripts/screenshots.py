@@ -40,7 +40,7 @@ try:
             page.click("#tab-wallet")
             page.fill("#waddr", os.environ["SHOT_WALLET"])
             page.click("#wgo")
-            page.wait_for_selector(".flow .card", timeout=30000)
+            page.wait_for_selector(".ledger .card", timeout=30000)
             page.wait_for_timeout(1600)
             page.screenshot(path=f"{out}/wallet_audit.png", full_page=True)
             print("captured: wallet_audit.png")

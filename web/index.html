@@ -109,6 +109,21 @@ main{flex:1;display:grid;grid-template-columns:392px minmax(0,1fr) 336px;min-hei
 .src .flag{color:var(--amber);font-family:var(--mono);font-size:11px;margin-top:6px}
 .src .pin{color:var(--teal);font-family:var(--mono);font-size:11px;margin-top:6px}
 h2.caps{color:var(--ink-faint);font-size:11px}
+.ledger{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.ledger .card{width:auto;min-width:0}
+.dash{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;align-items:start}
+.tile{border:1px solid var(--line);background:var(--bg-lowest);padding:14px;min-width:0}
+.tile>h2{margin-bottom:10px}
+.t12{grid-column:span 12}.t8{grid-column:span 8}.t6{grid-column:span 6}.t4{grid-column:span 4}
+@media (max-width:1400px){.t4{grid-column:span 6}.t8{grid-column:span 12}}
+.stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.stat-tile{border:1px solid var(--line);background:var(--bg-low);padding:12px 14px}
+.stat-tile .n{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--teal)}
+.stat-tile .n.bad{color:var(--orange)} .stat-tile .n.dim{color:var(--ink-dim)}
+.stat-tile .l{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--ink-faint);text-transform:uppercase;margin-top:2px}
+.stat-tile{position:relative}
+.info{position:absolute;top:8px;right:10px;width:15px;height:15px;border:1px solid var(--ink-faint);border-radius:50%;color:var(--ink-faint);font-family:var(--mono);font-size:10px;line-height:14px;text-align:center;cursor:help}
+.info:hover{color:var(--teal);border-color:var(--teal)}
 .section-gap{margin-bottom:16px}
 @media (prefers-reduced-motion: no-preference){
   @keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
@@ -160,7 +175,9 @@ h2.caps{color:var(--ink-faint);font-size:11px}
         </div>
   </div>
   <div class="right">
-    <div class="panel-head"><span class="caps" style="color:var(--ink-faint)">EVOLUTION_CANVAS</span><span class="caps" id="srcflag" style="color:var(--ink-faint)"></span></div>
+    <div class="panel-head"><span class="caps" style="color:var(--ink-faint)">EVOLUTION_CANVAS</span><span style="display:flex;gap:12px;align-items:center">
+      <button id="shareboard" class="caps" style="display:none;background:none;border:1px solid var(--info);color:var(--info);padding:4px 10px;cursor:pointer">SHARE BOARD</button>
+      <span class="caps" id="srcflag" style="color:var(--ink-faint)"></span></span></div>
     <div class="canvas-wrap" id="canvas">
       <div class="idle">
         <div class="big">AWAITING DATA INGESTION…</div>
@@ -181,7 +198,7 @@ h2.caps{color:var(--ink-faint);font-size:11px}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=n=>n==null?"n/a":Number(n).toLocaleString("en-US",{maximumFractionDigits:2});
-let file=null,contrib=null;
+let file=null,contrib=null,lastEvents=[],lastResult=null;
 // shareable deep link: /?wallet=ADDR&network=devnet auto-runs the audit
 const _qp=new URLSearchParams(location.search);
 if(_qp.get("wallet")){
@@ -191,55 +208,50 @@ if(_qp.get("wallet")){
     $("wgo").click();
   });
 }
-$("wgo").onclick=async()=>{
-  const a=$("waddr").value.trim();if(!a)return;
-  $("wgo").disabled=true;
-  $("canvas").innerHTML=`<div class="idle"><div class="big">AUDITING ${esc(a.slice(0,8))}…</div><p>reading public chain data — no keys, no custody</p></div>`;
-  try{
-    const r=await fetch(`/api/wallet?address=${encodeURIComponent(a)}&network=${$("wnet").value}`);
-    if(!r.ok){throw new Error(await r.text());}
-    renderWallet(await r.json());
-  }catch(e){
-    $("canvas").innerHTML=`<div class="idle" style="border-color:var(--orange)"><div class="big" style="color:var(--orange)">AUDIT FAILED</div><p>${esc(e.message)}</p></div>`;
-  }
-  $("wgo").disabled=false;
-};
-function renderWallet(w){
-  const sx=w.sanctions||{};
-  let h="";
-  if(sx.listed){
-    h+=`<div class="banner" style="border-color:var(--orange);color:var(--orange);background:rgba(255,77,0,.08)">⚠ SANCTIONED — this address is ${esc(sx.note)} (${esc(sx.source)}). Attribution of a public record, not a character judgment.</div>`;
-  }else{
-    h+=`<div class="mono" style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">screening: ${esc(sx.note||"no public sanctions reports found")} · ${esc(sx.source||"OFAC SDN")} · absence of reports is not an assertion of safety</div>`;
-  }
-  h+=`<div class="answer"><span class="caps">Wallet audit — ${esc(w.network)}${w.cached?" · cached":""}</span>
-    <div class="mono" style="font-size:12px;word-break:break-all;margin-top:4px">${esc(w.address)}</div>
-    <button class="exec" id="wshare" style="margin-top:8px;width:auto;padding:6px 14px;background:none;border:1px solid var(--info);color:var(--info)">SHARE AUDIT LINK</button>
-    <span id="wshareout" style="margin-left:10px"></span></div>`;
-  if(!w.txs.length){
-    h+=`<div class="idle"><div class="big">NO ACTIVITY</div><p>no transactions found for this address on ${esc(w.network)}</p></div>`;
-    $("canvas").innerHTML=h;wireShare(w);return;
-  }
-  h+=`<h2 class="caps section-gap">Recent activity — ${w.txs.length} transaction(s)</h2><div class="flow">`;
-  w.txs.forEach((t,i)=>{
-    const inb=t.delta>=0, col=t.err?"var(--orange)":(t.veripay?"var(--purple)":inb?"var(--teal)":"var(--ink-dim)");
-    h+=`<div class="card ${t.err?"bad":t.veripay?"":"ok"}" style="animation-delay:${i*110}ms;border-left-color:${col};border-top-color:${col}">
-      <div class="card-head"><h3>${t.time?new Date(t.time*1000).toLocaleString():"—"}</h3>
-        <span class="badge ${t.err?"bad":"ok"}" style="color:${col};border-color:${col}">${t.err?"FAILED":(inb?"IN":"OUT")}</span></div>
-      ${t.counterparty_sanctioned?`<div class="variance" style="margin:0 12px">⚠ COUNTERPARTY SANCTIONED — listed on OFAC SDN; money moved with a listed address</div>`:""}
-      <div class="card-body">
-        <div class="grid2"><div><span class="caps">Δ balance</span><span class="val" style="color:${col}">${(t.delta/1e9).toFixed(6)} SOL</span></div>
-        <div><span class="caps">Counterparty</span><span class="val" style="font-size:11px;word-break:break-all">${esc((t.counterparty||"—").slice(0,12))}…</span></div></div>
-        ${t.memo?`<div class="eq"><span class="caps">${t.veripay?"VERIPAY AUDIT MEMO":"MEMO"}</span><div class="expr" style="font-size:11px;word-break:break-all;color:${t.veripay?"var(--purple)":"var(--ink-dim)"}">${esc(t.memo)}</div></div>`:""}
-        <a class="mono" style="font-size:10px;color:var(--info)" target="_blank"
-           href="https://explorer.solana.com/tx/${esc(t.signature)}?cluster=${w.network==="mainnet"?"mainnet-beta":"devnet"}">${esc(t.signature.slice(0,20))}… ↗</a>
-      </div></div>`;
-    if(i<w.txs.length-1)h+=`<div class="arrow" style="animation-delay:${i*110+80}ms">→</div>`;
-  });
-  h+=`</div>`;
-  $("canvas").innerHTML=h;
+
+// ── Shareable board: the whole released result rides the URL FRAGMENT —
+// fragments never reach a server, so sharing distributes the board, not
+// the document. Integrity: a client-side sha256 of the exact payload,
+// plus the audit_log_root for on-chain verification.
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const unb64u=s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
+async function gz(bytes,mode){
+  const cs=mode==="c"?new CompressionStream("gzip"):new DecompressionStream("gzip");
+  const out=new Response(new Blob([bytes]).stream().pipeThrough(cs));
+  return new Uint8Array(await out.arrayBuffer());
 }
-fetch("/api/contribution").then(r=>r.status===200?r.json():null).then(j=>{contrib=j;}).catch(()=>{});
+async function shareBoard(){
+  if(!lastResult)return;
+  const raw=new TextEncoder().encode(JSON.stringify(lastResult));
+  const packed=b64u(await gz(raw,"c"));
+  const url=`${location.origin}${location.pathname}#board=${packed}`;
+  const dig=await crypto.subtle.digest("SHA-256",raw);
+  const hex=[...new Uint8Array(dig)].map(x=>x.toString(16).padStart(2,"0")).join("");
+  try{await navigator.clipboard.writeText(url);}catch(e){}
+  const b=$("shareboard");
+  b.textContent=`COPIED · ${hex.slice(0,12)}`;
+  setTimeout(()=>{b.textContent="SHARE BOARD";},4000);
+}
+async function openSharedBoard(){
+  const m=location.hash.match(/#board=([A-Za-z0-9_-]+)/);
+  if(!m)return false;
+  try{
+    const raw=await gz(unb64u(m[1]),"d");
+    const r=JSON.parse(new TextDecoder().decode(raw));
+    const dig=await crypto.subtle.digest("SHA-256",raw);
+    const hex=[...new Uint8Array(dig)].map(x=>x.toString(16).padStart(2,"0")).join("");
+    lastResult=r;lastEvents=[];
+    render(r);
+    $("canvas").insertAdjacentHTML("afterbegin",
+      `<div class="banner" style="border-color:var(--info);color:var(--info);background:rgba(61,220,151,.05)">SHARED BOARD — rendered read-only from the link, nothing fetched from a server · link digest sha256:${hex.slice(0,16)}… · audit root ${esc((r.audit_log_root||"").slice(0,16))}… (verifiable on-chain where notarized)</div>`);
+    $("srcflag").textContent="SOURCE: SHARED LINK";
+    $("srcflag").style.color="var(--info)";
+  }catch(e){
+    $("canvas").innerHTML=`<div class="idle" style="border-color:var(--orange)"><div class="big" style="color:var(--orange)">BAD BOARD LINK</div><p>${esc(String(e))}</p></div>`;
+  }
+  return true;
+}
+addEventListener("DOMContentLoaded",()=>{openSharedBoard();});
 
 $("drop").onclick=()=>$("file").click();
 $("drop").ondragover=e=>e.preventDefault();
@@ -254,6 +266,7 @@ function log(stage,status,detail,ms){
   const cur=$("log").querySelector(".cursor");$("log").insertBefore(line,cur);$("log").scrollTop=$("log").scrollHeight;
 }
 $("exec").onclick=async()=>{
+  lastEvents=[];
   if(!file)return;
   $("exec").disabled=true;
   $("canvas").innerHTML=`<div class="idle"><div class="big">PIPELINE RUNNING…</div><p>verification gate holds all output until release</p></div>`;
@@ -270,13 +283,16 @@ $("exec").onclick=async()=>{
         const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
         if(!line)continue;
         const ev=JSON.parse(line);
+        lastEvents.push(ev);
         if(ev.status!=="running")log(ev.stage,ev.status,ev.detail,ev.elapsed_ms);
         if(ev.stage==="release")result=ev.result;
       }
     }
   }catch(err){log("system","fail",String(err));}
   $("exec").disabled=false;
-  if(result)render(result);
+  if(result){lastResult=result;render(result);
+    $("shareboard").style.display="";
+    $("shareboard").onclick=shareBoard;}
 };
 // ── Renderer registry (cityos pattern): type -> (gate, render). A gate
 // checks SHAPE, not presence — malformed data degrades to a plain table
@@ -336,7 +352,56 @@ function renderChart(c){
   if(!k.gate(c))return `<div class="answer" style="margin-bottom:12px;padding:12px 14px">${head}${renderFallbackTable(c.kind,c.points)}</div>`;
   return `<div class="answer" style="margin-bottom:12px;padding:12px 14px">${head}${k.render(c)}</div>`;
 }
+function T(span,inner){return inner?`<div class="tile t${span}">${inner}</div>`:"";}
 const RENDERERS={
+  kpis:{gate:r=>r.summary&&typeof r.summary==="object",render:r=>{
+    const s=r.summary;
+    const kpi_info={
+      "facts extracted":"Figures the model pulled from the document that survived cleaning — each must be numeric and carry a citation.",
+      "checks verified":"Arithmetic claims recomputed in Python that matched the figure the DOCUMENT states (never a number the model computed itself).",
+      "mismatches":"Recomputed arithmetic that disagrees with the stated figure — the exact discrepancies a manual review is meant to catch.",
+      "PII masked":"Personal identifiers redacted locally before any text reached the model: NRIC (date-validated), emails, phones, names via title/patronymic/cue, PDF author metadata.",
+      "evidenced risks":"Risks the model flagged that cite verified facts as evidence — an uncited risk is discarded, never shown.",
+    };
+    const cells=[
+      [s.facts_extracted,"facts extracted",""],
+      [s.checks_passed,"checks verified",""],
+      [s.checks_failed,"mismatches",s.checks_failed?"bad":"dim"],
+      [r.redaction_count,"PII masked","dim"],
+      [(r.risks||[]).length,"evidenced risks",(r.risks||[]).length?"bad":"dim"],
+    ];
+    return `<div class="stat-row t12" style="grid-column:span 12">`+cells.map(([n,l,c])=>
+      `<div class="stat-tile"><span class="info" title="${esc(kpi_info[l]||"")}">i</span><div class="n ${c}">${n}</div><div class="l">${l}</div></div>`).join("")+`</div>`;
+  }},
+  check_chart:{gate:r=>Array.isArray(r.checks)&&r.checks.some(c=>c.expected!=null&&c.actual!=null),render:r=>{
+    const rows=r.checks.filter(c=>c.expected!=null&&c.actual!=null);
+    const max=Math.max(...rows.flatMap(c=>[c.expected,c.actual]))||1;
+    const W=640,BH=16,GRP=44;let y=0,svg="";
+    rows.forEach(c=>{
+      const we=Math.max(2,(c.expected/max)*(W-330)),wa=Math.max(2,(c.actual/max)*(W-330));
+      const bad=!c.passed&&!c.error;
+      svg+=`<text x="0" y="${y+12}" fill="var(--ink-dim)" font-size="10" font-family="var(--mono)">${esc(c.description.slice(0,26))}</text>
+        <rect x="180" y="${y+2}" width="${we}" height="${BH-6}" rx="3" fill="var(--ink-faint)"/>
+        <rect x="180" y="${y+BH-2}" width="${wa}" height="${BH-6}" rx="3" fill="${bad?"var(--orange)":"var(--teal)"}"/>
+        <text x="${185+Math.max(we,wa)}" y="${y+BH+4}" fill="${bad?"var(--orange)":"var(--ink)"}" font-size="10" font-family="var(--mono)">${bad?"Δ "+fmt(c.actual-c.expected):"match"}</text>`;
+      y+=GRP;
+    });
+    return T(6,`<h2 class="caps">Reported vs Calculated — grey stated, colored recomputed</h2><svg viewBox="0 0 ${W} ${y}" style="width:100%">${svg}</svg>`).replace('class="tile t6"','class="tile t6"');
+  }},
+  timings:{gate:()=>Array.isArray(lastEvents),render:()=>{
+    const done=lastEvents.filter(e=>e.status==="ok"||e.status==="fail");
+    if(!done.length)return "";
+    const max=Math.max(...done.map(e=>e.elapsed_ms||0))||1;
+    let y=0,svg="";
+    done.forEach(e=>{
+      const w=Math.max(2,((e.elapsed_ms||0)/max)*300);
+      svg+=`<text x="0" y="${y+11}" fill="var(--ink-dim)" font-size="10" font-family="var(--mono)">${esc(e.stage)}</text>
+        <rect x="130" y="${y+2}" width="${w}" height="10" rx="3" fill="${e.status==="fail"?"var(--orange)":"var(--purple)"}"/>
+        <text x="${136+w}" y="${y+11}" fill="var(--ink-faint)" font-size="10" font-family="var(--mono)">${e.elapsed_ms??0} ms</text>`;
+      y+=20;
+    });
+    return T(6,`<h2 class="caps">Stage timings — measured, this run</h2><svg viewBox="0 0 480 ${y}" style="width:100%">${svg}</svg>`);
+  }},
   charts:{gate:r=>r.charts==null||Array.isArray(r.charts),render:r=>{
     if(!r.charts||!r.charts.length)return "";
     let h=`<h2 class="caps section-gap">Visualizations — the model chose the form, verified facts supply the data</h2>`;
@@ -437,7 +502,8 @@ const RENDERERS={
   h+=`</div></div>`;
   return h;}},
 };
-const ARTIFACT_ORDER=["insights","charts","patterns","risks","checks","sources"];
+const ARTIFACT_ORDER=["kpis","insights","charts","check_chart","patterns","risks","timings","checks","sources"];
+const TILE_SPAN={insights:8,charts:6,patterns:4,risks:4,checks:12,sources:12};
 function renderArtifact(type,r){
   const reg=RENDERERS[type];
   if(!reg)return `<div class="banner" style="border-color:var(--orange);color:var(--orange)">Unregistered artifact type: ${esc(type)}</div>`;
@@ -475,9 +541,9 @@ function renderWallet(w){
     <span id="wshareout" style="margin-left:10px"></span></div>`;
   if(!w.txs.length){
     h+=`<div class="idle"><div class="big">NO ACTIVITY</div><p>no transactions found for this address on ${esc(w.network)}</p></div>`;
-    $("canvas").innerHTML=h;wireShare(w);return;
+    $("canvas").innerHTML=h;wireShare(w);wireShare(w);return;
   }
-  h+=`<h2 class="caps section-gap">Recent activity — ${w.txs.length} transaction(s)</h2><div class="flow">`;
+  h+=`<h2 class="caps section-gap">Recent activity — latest ${w.txs.length} transaction(s) · server caps at 25 per fetch</h2><div class="ledger">`;
   w.txs.forEach((t,i)=>{
     const inb=t.delta>=0, col=t.err?"var(--orange)":(t.veripay?"var(--purple)":inb?"var(--teal)":"var(--ink-dim)");
     h+=`<div class="card ${t.err?"bad":t.veripay?"":"ok"}" style="animation-delay:${i*110}ms;border-left-color:${col};border-top-color:${col}">
@@ -491,10 +557,9 @@ function renderWallet(w){
         <a class="mono" style="font-size:10px;color:var(--info)" target="_blank"
            href="https://explorer.solana.com/tx/${esc(t.signature)}?cluster=${w.network==="mainnet"?"mainnet-beta":"devnet"}">${esc(t.signature.slice(0,20))}… ↗</a>
       </div></div>`;
-    if(i<w.txs.length-1)h+=`<div class="arrow" style="animation-delay:${i*110+80}ms">→</div>`;
   });
   h+=`</div>`;
-  $("canvas").innerHTML=h;
+  $("canvas").innerHTML=h;wireShare(w);
 }
 fetch("/api/contribution").then(r=>r.status===200?r.json():null).then(j=>{contrib=j;}).catch(()=>{});
 $("drop").onclick=()=>$("file").click();
@@ -534,16 +599,34 @@ $("exec").onclick=async()=>{
   $("exec").disabled=false;
   if(result)render(result);
 };
+function wireShare(w){
+  const b=document.getElementById("wshare");if(!b)return;
+  b.onclick=async()=>{
+    const r=await fetch(`/api/qr?address=${encodeURIComponent(w.address)}&network=${w.network}`);
+    if(!r.ok)return;
+    const j=await r.json();
+    try{await navigator.clipboard.writeText(j.url);}catch(e){}
+    document.getElementById("wshareout").innerHTML=
+      `<img src="${j.qr}" style="width:120px;height:120px;border:2px solid var(--info);background:#000;padding:3px;vertical-align:middle"> <span class="mono" style="font-size:10px;color:var(--ink-faint)">link copied — opens the audit on any device that can reach this server</span>`;
+  };
+}
 function render(r){
   if(r.error){$("canvas").innerHTML=`<div class="idle" style="border-color:var(--orange)"><div class="big" style="color:var(--orange)">PIPELINE HALTED</div><p>${esc(r.error)}</p></div>`;return;}
   $("srcflag").textContent=r.fallback_used?"SOURCE: CACHED":"SOURCE: LIVE";
   $("srcflag").style.color=r.fallback_used?"var(--amber)":"var(--teal)";
+  lastEvents=lastEvents.slice(-40);
   let h="";
   if(r.fallback_used)h+=`<div class="banner">⚠ CACHED — the live model call failed; the demo fallback answered. Verification below still ran for real against these facts.</div>`;
   h+=`<div class="answer"><span class="caps">Analysis</span><div class="body">${esc(r.answer)}</div>`;
   if(r.recommendation)h+=`<div class="rec"><b>RECOMMENDATION »</b> ${esc(r.recommendation)}</div>`;
   h+=`</div>`;
-  ARTIFACT_ORDER.forEach(t=>{h+=renderArtifact(t,r);});
+  h+=`<div class="dash">`;
+  ARTIFACT_ORDER.forEach(t=>{
+    const out=renderArtifact(t,r);
+    if(!out)return;
+    h+=(t in TILE_SPAN)?T(TILE_SPAN[t],out):out;
+  });
+  h+=`</div>`;
   $("canvas").innerHTML=h;
   if(!matchMedia("(prefers-reduced-motion: reduce)").matches){
     document.querySelectorAll("#canvas .val[data-n]").forEach(el=>{
