@@ -79,15 +79,26 @@
     {
       "kind": "composition",
       "description": "Product revenue is the largest single share of total revenue.",
-      "operand_fact_ids": ["f1"],
+      "operand_fact_ids": [
+        "f1"
+      ],
       "against_fact_id": "f4",
-      "evidence_fact_ids": ["f1", "f4"]
+      "evidence_fact_ids": [
+        "f1",
+        "f4"
+      ]
     },
     {
       "kind": "ratio",
       "description": "Operating expenses as a share of total revenue (opex-to-revenue).",
-      "operand_fact_ids": ["f7", "f4"],
-      "evidence_fact_ids": ["f7", "f4"]
+      "operand_fact_ids": [
+        "f7",
+        "f4"
+      ],
+      "evidence_fact_ids": [
+        "f7",
+        "f4"
+      ]
     }
   ],
   "risks": [
@@ -108,6 +119,42 @@
         "f4",
         "f5",
         "f6"
+      ]
+    }
+  ],
+  "charts": [
+    {
+      "kind": "donut",
+      "title": "Revenue mix by segment",
+      "points": [
+        {
+          "fact_id": "f1"
+        },
+        {
+          "fact_id": "f2"
+        },
+        {
+          "fact_id": "f3"
+        }
+      ]
+    },
+    {
+      "kind": "bar",
+      "title": "Stated total vs segment sum",
+      "points": [
+        {
+          "fact_id": "f4",
+          "label": "Stated total"
+        },
+        {
+          "fact_id": "f1"
+        },
+        {
+          "fact_id": "f2"
+        },
+        {
+          "fact_id": "f3"
+        }
       ]
     }
   ]
