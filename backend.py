@@ -10,8 +10,10 @@ Everything else is internal.
 
 import json
 import os
+import random
 import re
 import tempfile
+import time
 
 import pdfplumber
 import openpyxl
@@ -260,7 +262,7 @@ def _call_deepseek(pages: list[tuple[str, str]], question: str) -> dict:
             "and put it in your .env file."
         )
 
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", timeout=45)
     doc = "\n\n".join(f"--- {label} ---\n{text}" for label, text in pages)
     resp = client.chat.completions.create(
         model=MODEL,
@@ -299,10 +301,17 @@ def ask_llm(pages: list[tuple[str, str]], question: str) -> tuple[dict, bool]:
     """
     try:
         return _call_deepseek(pages, question), False
-    except Exception as e:
-        if os.environ.get("DEMO_FALLBACK") == "1":
-            return _load_cached_response(), True
-        raise RuntimeError(f"Model call failed: {e}")
+    except Exception:
+        # One bounded retry with jitter: hotspot blips and transient 5xx
+        # are common; a second attempt is cheap. Anything past that is a
+        # real outage and belongs to the fallback/raise path.
+        time.sleep(random.uniform(0.3, 0.9))
+        try:
+            return _call_deepseek(pages, question), False
+        except Exception as e:
+            if os.environ.get("DEMO_FALLBACK") == "1":
+                return _load_cached_response(), True
+            raise RuntimeError(f"Model call failed after retry: {e}")
 
 
 # ── Step 4: Deterministic verification (no eval, ever) ────────────────────

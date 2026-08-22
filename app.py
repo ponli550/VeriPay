@@ -34,6 +34,11 @@ FAKE = {
          "expected": 2750000.0, "actual": 2650000.0,
          "passed": False, "error": None},
     ],
+    "risks": [
+        {"description": "Stated total revenue exceeds the sum of its "
+         "segments by RM 100,000.", "severity": "high",
+         "evidence_fact_ids": ["f1", "f2", "f3", "f4"]},
+    ],
     "summary": {"facts_extracted": 4, "checks_run": 1,
                 "checks_passed": 0, "checks_failed": 1},
     "redaction_count": 4,
@@ -47,26 +52,40 @@ FAKE = {
 # ── Styling ────────────────────────────────────────────────────────────────
 
 CUSTOM_CSS = """
-.mismatch-card {
-    background: #FEE2E2; border-left: 4px solid #DC2626;
+/* All result cards render on their own fixed light background, so we pin
+   both the card background AND every descendant's text colour with
+   !important. This keeps them readable under Gradio's dark theme, which
+   would otherwise recolour the text (or the background) and destroy
+   contrast. Colours are chosen to pass WCAG AA on their own background. */
+
+.mismatch-card, .verified-card, .warning-card, .rec-card, .source-card {
     padding: 14px 18px; border-radius: 8px; margin: 10px 0;
-    color: #111827;
+}
+.mismatch-card, .mismatch-card * { color: #7F1D1D !important; }
+.verified-card, .verified-card * { color: #14532D !important; }
+.warning-card,  .warning-card *  { color: #78350F !important; }
+.rec-card,      .rec-card *      { color: #1E3A8A !important; }
+.source-card,   .source-card *   { color: #1E293B !important; }
+
+.mismatch-card {
+    background: #FEE2E2 !important; border-left: 4px solid #DC2626;
 }
 .verified-card {
-    background: #DCFCE7; border-left: 4px solid #16A34A;
-    padding: 14px 18px; border-radius: 8px; margin: 10px 0;
-    color: #111827;
+    background: #DCFCE7 !important; border-left: 4px solid #16A34A;
 }
 .warning-card {
-    background: #FEF3C7; border-left: 4px solid #D97706;
-    padding: 14px 18px; border-radius: 8px; margin: 10px 0;
-    color: #111827;
+    background: #FEF3C7 !important; border-left: 4px solid #D97706;
+}
+.rec-card {
+    background: #EFF6FF !important; border-left: 4px solid #2563EB;
 }
 .cached-banner {
-    background: #FEF3C7; border: 1px solid #D97706;
+    background: #FEF3C7 !important; border: 1px solid #D97706;
     padding: 10px 16px; border-radius: 8px; margin: 6px 0 12px 0;
-    color: #92400E; font-weight: 600; font-size: 14px;
+    font-weight: 600; font-size: 14px;
 }
+.cached-banner, .cached-banner * { color: #78350F !important; }
+
 .stat-bar {
     display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
 }
@@ -96,24 +115,52 @@ CUSTOM_CSS = """
     color: #111827;
 }
 .source-card {
-    background: #F8FAFC; border: 1px solid #E2E8F0;
-    border-radius: 8px; padding: 12px 16px; margin: 8px 0;
-    color: #111827;
+    background: #F1F5F9 !important; border: 1px solid #CBD5E1;
 }
 .source-card blockquote {
-    border-left: 3px solid #94A3B8; margin: 6px 0 0 0;
-    padding-left: 10px; color: #475569; font-style: italic;
+    border-left: 3px solid #64748B; margin: 6px 0 0 0;
+    padding-left: 10px; font-style: italic;
+}
+.source-card blockquote, .source-card blockquote * {
+    color: #334155 !important;
 }
 .page-tag {
-    display: inline-block; background: #E2E8F0; color: #334155;
+    display: inline-block; background: #CBD5E1 !important;
+    color: #1E293B !important;
     padding: 2px 8px; border-radius: 4px; font-size: 12px;
     font-weight: 600; margin-left: 6px;
 }
+/* Inline figures inside cards: keep them dark on a subtle light chip so
+   numbers stay legible regardless of theme. */
+.mismatch-card code, .verified-card code, .warning-card code,
+.rec-card code, .source-card code {
+    background: rgba(15, 23, 42, 0.08) !important;
+    padding: 1px 5px; border-radius: 4px;
+}
 .redacted-pre {
-    background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;
+    background: #F1F5F9 !important; border: 1px solid #CBD5E1;
+    border-radius: 8px;
     padding: 12px; font-family: ui-monospace, Menlo, monospace;
-    font-size: 12px; color: #334155; white-space: pre-wrap;
+    font-size: 12px; color: #334155 !important; white-space: pre-wrap;
     max-height: 260px; overflow-y: auto;
+}
+.redacted-pre * { color: #334155 !important; }
+/* Warning flag sits inside a .source-card, so override the card's text
+   rule to keep its amber. */
+.source-card .quote-flag, .source-card .quote-flag * {
+    color: #92400E !important; font-size: 12px; margin-top: 4px;
+}
+/* Caption under the redacted preview lives on the theme background, so
+   give it its own chip to stay legible in light and dark. */
+.redacted-note {
+    font-size: 12px; margin-top: 6px;
+    padding: 8px 10px; border-radius: 6px;
+    background: rgba(100, 116, 139, 0.15);
+    color: #475569 !important;
+}
+.redacted-note code {
+    background: rgba(15, 23, 42, 0.10) !important;
+    color: #334155 !important; padding: 1px 5px; border-radius: 4px;
 }
 """
 
@@ -145,9 +192,25 @@ def render_summary(result: dict) -> str:
 </div>"""
 
 
+def render_risks(result: dict) -> str:
+    """Severity-coded risk cards, evidence ids visible — parity with the
+    primary web UI. Empty input renders nothing, not a placeholder."""
+    risks = result.get("risks") or []
+    html = ""
+    for k in risks:
+        sev = str(k.get("severity", "medium")).upper()
+        cls = {"HIGH": "mismatch-card", "MEDIUM": "warning-card"}.get(sev, "source-card")
+        ev = ", ".join(k.get("evidence_fact_ids") or [])
+        html += (f'<div class="{cls}"><strong>⚠️ {sev} RISK:</strong> '
+                 f'{k.get("description","")}<br>'
+                 f'<span style="font-size:12px;color:#64748B;">evidence: '
+                 f'<code>{ev}</code></span></div>')
+    return html
+
+
 def render_checks(result: dict) -> str:
     checks = result.get("checks") or []
-    html = ""
+    html = render_risks(result)
 
     rec = (result.get("recommendation") or "").strip()
     if rec:
@@ -195,7 +258,7 @@ def render_facts(result: dict) -> str:
     for f in facts:
         q = f.get("quote") or "(no quote)"
         flag = "" if f.get("verified_in_source", True) else (
-            '<div style="color:#B45309;font-size:12px;margin-top:4px;">'
+            '<div class="quote-flag">'
             '⚠️ quote not found verbatim in source</div>'
         )
         html += (f'<div class="source-card">'
@@ -212,7 +275,7 @@ def render_redacted(result: dict) -> str:
         return ""
     import html as _html
     return (f'<div class="redacted-pre">{_html.escape(preview)}</div>'
-            '<p style="font-size:12px;color:#64748B;">This is the start of '
+            '<p class="redacted-note">This is the start of '
             'the exact text sent to the model — PII already replaced by '
             '<code>[..._REDACTED]</code> tokens. Known limit: a bare name '
             'with no title, patronymic, or signature cue is not caught, '
