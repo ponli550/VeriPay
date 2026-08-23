@@ -165,6 +165,18 @@ h2.caps{color:var(--ink-faint);font-size:11px}
         <div class="file" id="fname">no file staged</div>
         <input type="file" id="file" accept=".pdf,.xlsx" hidden>
       </div>
+      <div class="caps" style="color:var(--ink-faint);margin:6px 0 6px">Connect your AI (optional)</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <select class="q" id="prov" style="width:110px;margin-bottom:0">
+          <option value="">default</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="gemini">Gemini</option>
+          <option value="claude">Claude</option>
+          <option value="openai">OpenAI</option>
+        </select>
+        <input class="q" id="userkey" type="password" placeholder="your API key — rides this request only" style="margin-bottom:0">
+      </div>
+      <div class="mono" style="font-size:10px;color:var(--ink-faint);margin-bottom:8px">your key is never stored or logged — it is used once and discarded with the request</div>
       <input class="q" id="q" value="What was total revenue, and does it add up?">
       <button class="exec" id="exec" disabled>▶ EXECUTE PIPELINE</button>
       <p class="privacy"><b>PII is redacted locally before any text reaches the model</b> — only
@@ -361,6 +373,8 @@ $("exec").onclick=async()=>{
   $("canvas").innerHTML=`<div class="idle"><div class="big">PIPELINE RUNNING…</div><p>verification gate holds all output until release</p></div>`;
   $("srcflag").textContent="";
   const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
+  if($("prov").value)fd.append("provider",$("prov").value);
+  if($("userkey").value)fd.append("api_key",$("userkey").value);
   let result=null;
   try{
     const resp=await fetch("/api/analyze",{method:"POST",body:fd});

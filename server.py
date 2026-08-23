@@ -130,7 +130,9 @@ async def build_payment(request: Request):
 
 
 @app.post("/api/analyze")
-async def analyze(file: UploadFile, question: str = Form(...)):
+async def analyze(file: UploadFile, question: str = Form(...),
+                  provider: str = Form(""), api_key: str = Form("")):
+    # BYOK: provider + key ride this request only — never stored or logged.
     suffix = os.path.splitext(file.filename or "")[1].lower() or ".pdf"
     fd, path = tempfile.mkstemp(prefix="finverify_", suffix=suffix)
     with os.fdopen(fd, "wb") as out:
@@ -138,7 +140,10 @@ async def analyze(file: UploadFile, question: str = Form(...)):
 
     def stream():
         try:
-            for event in backend.analyze_stream(path, question):
+            for event in backend.analyze_stream(
+                    path, question,
+                    provider=(provider or None),
+                    api_key=(api_key or None)):
                 if event.get("stage") == "release" and event.get("result"):
                     root = event["result"].get("audit_log_root")
                     if root:

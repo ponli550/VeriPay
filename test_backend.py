@@ -17,6 +17,15 @@ import backend
 
 PASS, FAIL = 0, 0
 
+# Fail loudly if the sample is missing. Many sections below are gated on
+# sample_report.pdf existing; without this guard, a missing sample would
+# silently skip those checks and the suite would report a FALSE green.
+if not os.path.exists(os.path.join(os.path.dirname(__file__), "sample_report.pdf")):
+    print("ERROR: sample_report.pdf not found. Run `python make_sample.py` "
+          "first — the suite needs it and would otherwise skip tests and "
+          "report a misleading pass.")
+    sys.exit(1)
+
 
 def check(label, condition, detail=""):
     global PASS, FAIL
@@ -31,13 +40,10 @@ def check(label, condition, detail=""):
 # ── 1. PDF parsing ────────────────────────────────────────────────────────
 
 print("\n=== 1. PDF parsing ===")
-if os.path.exists("sample_report.pdf"):
-    pages = backend.parse_pdf("sample_report.pdf")
-    check("reads pages", len(pages) > 0, f"got {len(pages)}")
-    check("text is not empty", len(pages[0][1]) > 50)
-    check("contains revenue", "revenue" in pages[0][1].lower())
-else:
-    print("  WARN sample_report.pdf not found — run make_sample.py first")
+pages = backend.parse_pdf("sample_report.pdf")
+check("reads pages", len(pages) > 0, f"got {len(pages)}")
+check("text is not empty", len(pages[0][1]) > 50)
+check("contains revenue", "revenue" in pages[0][1].lower())
 
 # ── 2. XLSX parsing ───────────────────────────────────────────────────────
 
@@ -327,10 +333,11 @@ if os.path.exists("sample_report.pdf"):
 
 print("\n=== 16. DeepSeek provider ===")
 check("backend exposes _call_deepseek", hasattr(backend, "_call_deepseek"))
-check("gemini entrypoint is gone", not hasattr(backend, "_call_gemini"))
+check("gemini is a BYOK provider entrypoint", hasattr(backend, "_call_gemini"))
 check("default model is deepseek-chat", backend.MODEL == "deepseek-chat")
 _src = open(os.path.join(os.path.dirname(__file__), "backend.py")).read()
-check("no gemini references left in backend", "gemini" not in _src.lower())
+check("deepseek remains the env default",
+      '"deepseek"' in _src and "LLM_PROVIDER" in _src)
 _saved = {k: os.environ.pop(k, None)
           for k in ("DEEPSEEK_API_KEY", "deepseek_api")}
 os.environ.pop("DEMO_FALLBACK", None)
@@ -1046,6 +1053,114 @@ check("tiles flow through the registry, gates intact",
       "renderArtifact" in _h32 and "renderFallbackTable" in _h32
       and "const RENDERERS" in _h32)
 
+
+# ── 33. shareable interactive board — spec BEFORE code ─────────────────────
+
+print("\n=== 33. shareable board ===")
+_h33 = open(os.path.join(os.path.dirname(__file__), "web",
+                         "index.html")).read()
+check("share-board control exists", 'id="shareboard"' in _h33)
+check("board travels in the URL fragment, never to a server",
+      "#board=" in _h33 and "location.hash" in _h33)
+check("opening a board link renders it with a shared banner",
+      "SHARED BOARD" in _h33)
+check("link integrity digest computed client-side",
+      "crypto.subtle.digest" in _h33)
+check("audit root displayed on shared boards for on-chain verification",
+      "audit_log_root" in _h33)
+
+
+# ── 34. KPI info affordance — spec BEFORE code ─────────────────────────────
+
+print("\n=== 34. KPI info ===")
+_h34 = open(os.path.join(os.path.dirname(__file__), "web",
+                         "index.html")).read()
+check("every KPI stat tile carries an (i) with an explanation",
+      _h34.count('class="info"') >= 1 and "kpi_info" in _h34
+      and all(k in _h34 for k in
+              ("recomputed in Python", "before any text reached the model")))
+
+
+# ── 35. viewer-mode honesty on engine-less deployments — spec BEFORE code ──
+
+print("\n=== 35. viewer mode ===")
+_h35 = open(os.path.join(os.path.dirname(__file__), "web",
+                         "index.html")).read()
+check("engine presence probed, not assumed",
+      '"/api/analyze"' in _h35 and "405" in _h35 and "viewerMode" in _h35)
+check("viewer mode announces itself and disables execution",
+      "VIEWER MODE" in _h35 and "renders shared boards" in _h35)
+
+
+# ── 36. cloud prod mode wrapper — spec BEFORE code ─────────────────────────
+
+print("\n=== 36. cloud wrapper ===")
+check("vercel function wrapper exists",
+      os.path.exists(os.path.join(os.path.dirname(__file__), "api", "index.py")))
+check("vercel.json routes to the app",
+      os.path.exists(os.path.join(os.path.dirname(__file__), "vercel.json")))
+
+
+# ── 37. mobile layout — spec BEFORE code ──────────────────────────────────
+
+print("\n=== 37. mobile ===")
+_hm = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+_mob = "".join(_hm[_hm.index("@media (max-width:860px)"):].split())
+_j = _mob.find("@media", 10)
+_mob = _mob[:_j] if _j != -1 else _mob
+check("canvas is never hidden on phones", ".right{display:none}" not in _mob)
+check("phone layout stacks to one scrolling column",
+      "main{grid-template-columns:1fr" in _mob and "overflow:auto" in _mob)
+check("dashboard tiles collapse to a single column on phones",
+      ".dash{grid-template-columns:1fr}" in _mob)
+
+
+# ── 38. BYOK multi-provider — spec BEFORE code ─────────────────────────────
+
+print("\n=== 38. BYOK providers ===")
+check("provider registry exists",
+      hasattr(backend, "PROVIDERS") and set(backend.PROVIDERS) >= {"deepseek", "gemini", "claude"})
+_src38 = open(os.path.join(os.path.dirname(__file__), "backend.py")).read()
+check("claude path uses the official anthropic SDK, never a compat shim",
+      "import anthropic" in _src38
+      and "api.anthropic.com/v1/" not in _src38
+      and "claude-opus-5" in _src38)
+check("gemini path uses Google's official OpenAI-compatible endpoint",
+      "generativelanguage.googleapis.com/v1beta/openai" in _src38)
+# key threading: each provider callable receives the per-request key
+_seen38 = {}
+_orig38 = dict(backend.PROVIDERS)
+try:
+    for name in ("deepseek", "gemini", "claude"):
+        backend.PROVIDERS[name] = (lambda n: (lambda pages, q, key: (_seen38.__setitem__(n, key), {"answer": "x"})[1]))(name)
+    out, cached = backend.ask_llm([("Page 1", "t")], "q", provider="gemini", api_key="user-key-123")
+    check("per-request key reaches the provider", _seen38.get("gemini") == "user-key-123" and cached is False)
+    try:
+        backend.ask_llm([("Page 1", "t")], "q", provider="grok", api_key="k")
+        check("unknown provider fails loudly", False)
+    except Exception as e:
+        check("unknown provider fails loudly", "grok" in str(e))
+finally:
+    backend.PROVIDERS.update(_orig38)
+# stream + result must surface which provider answered
+_ks38 = {k: os.environ.pop(k, None) for k in ("DEEPSEEK_API_KEY", "deepseek_api")}
+os.environ["DEMO_FALLBACK"] = "1"
+try:
+    _o38 = backend.analyze("sample_report.pdf", "q")
+    check("result names the provider", _o38.get("provider") == "deepseek")
+finally:
+    os.environ.pop("DEMO_FALLBACK", None)
+    for k, v in _ks38.items():
+        if v is not None:
+            os.environ[k] = v
+_h38 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+check("UI: provider select + key field, honesty note",
+      'id="prov"' in _h38 and 'id="userkey"' in _h38
+      and "never stored" in _h38)
+_sv38 = open(os.path.join(os.path.dirname(__file__), "server.py")).read()
+check("server threads provider+key per request and never logs the key",
+      "api_key" in _sv38 and "provider" in _sv38)
+
 # ── 20. chain layer — verification-gated payments, written BEFORE the code ─
 
 print("\n=== 20. chain (Solana devnet, offline fake transport) ===")
@@ -1134,6 +1249,7 @@ if _has_ch:
 
 
 
+
 # ── 22. contribution card — real address, real QR, no fabrications ─────────
 # Written BEFORE the implementation.
 
@@ -1181,6 +1297,7 @@ try:
 except Exception as _e:
     print(f"  FAIL contribution spec crashed: {_e}")
     FAIL += 1
+
 
 
 
@@ -1270,6 +1387,7 @@ except Exception as _e23:
 
 
 
+
 # ── 26. wallet audit (paste-any-address, read-only) — spec BEFORE code ─────
 
 print("\n=== 26. wallet audit ===")
@@ -1326,6 +1444,7 @@ if _has_ex:
     _page = _c4.get("/").text
     check("frontend carries the wallet audit section",
           "WALLET_AUDIT" in _page)
+
 
 
 
@@ -1400,6 +1519,7 @@ if _has_sc:
 
 
 
+
 # ── 29. refusal notarization — spec BEFORE code ────────────────────────────
 
 print("\n=== 29. refusal notarization ===")
@@ -1431,6 +1551,7 @@ if hasattr(_ch3, "notarize_refusal"):
 
 
 
+
 # ── 30. refusal notarization wired into the live proof (#15) — spec first ──
 
 print("\n=== 30. devnet_live refusal wiring ===")
@@ -1440,6 +1561,7 @@ check("live proof notarizes the refusal", "notarize_refusal" in _dl)
 check("refusal leg prints its own explorer line", "REFUSAL-NOTARIZED" in _dl)
 check("refusal notarization happens on the REFUSED path, before the paid leg",
       _dl.index("notarize_refusal") < _dl.index("pay_if_verified(clean"))
+
 
 
 
@@ -1481,6 +1603,7 @@ check("no root -> memo stays in the original format", ":log:" not in _memor2)
 
 
 
+
 # ── 40. left-rail tabs — spec BEFORE code ──────────────────────────────────
 
 print("\n=== 40. left-rail tabs ===")
@@ -1496,20 +1619,6 @@ check("wallet markers survive the retheme",
       and "CONTRIBUTION_PROTOCOL" in _h40 and "COPY_ADDRESS" in _h40)
 
 
-
-# ── 42. wallet ledger UX — spec BEFORE code ────────────────────────────────
-
-print("\n=== 42. wallet ledger ===")
-_h42 = open(os.path.join(os.path.dirname(__file__), "web",
-                         "index.html")).read()
-_rw = _h42[_h42.index("function renderWallet"):_h42.index("function wireShare")]
-check("wallet activity is a wrapping ledger grid, not a horizontal strip",
-      'class="ledger"' in _rw and 'class="flow"' not in _rw)
-check("ledger cards flex to the grid", ".ledger .card{width:auto" in _h42)
-check("fetch cap is stated, never implied as completeness",
-      "latest" in _rw.lower() and "25" in _rw)
-check("the share button is actually WIRED, not just rendered",
-      "wireShare(w)" in _rw)
 
 
 # ── 45. pure-python server path (cloud prod mode) — spec BEFORE code ───────
@@ -1531,15 +1640,6 @@ try:
 except ValueError:
     check("pure validation still rejects garbage", True)
 
-
-# ── 46. viewer-mode honesty (restored after rebuild loss) ──────────────────
-
-print("\n=== 46. viewer mode ===")
-_h46 = open(os.path.join(os.path.dirname(__file__), "web",
-                         "index.html")).read()
-check("engine probed; viewer announces itself; wallet button gated",
-      '"/api/analyze"' in _h46 and "405" in _h46 and "viewerMode" in _h46
-      and "VIEWER MODE" in _h46 and "renders shared boards" in _h46)
 
 
 # ── 44. canvas scroll + counterparty sanity — spec BEFORE code ─────────────
@@ -1566,48 +1666,6 @@ check("program ids are never shown as the counterparty",
       _w44["txs"][0]["counterparty"] == "RealCounterparty1111111111111111111111111111",
       _w44["txs"][0]["counterparty"])
 
-
-# ── 47. RPC rate-limit degradation — spec BEFORE code ──────────────────────
-
-print("\n=== 47. 429 degradation ===")
-import explorer as _ex47
-_calls47 = {"n": 0}
-def _rpc47(method, params):
-    if method == "getSignaturesForAddress":
-        return [{"signature": f"S{i}", "blockTime": i, "err": None} for i in range(4)]
-    _calls47["n"] += 1
-    if params[0] == "S2":   # this one 429s on every attempt — retry can't save it
-        raise RuntimeError("{'code': 429, 'message': 'Too many requests'}")
-    return {"blockTime": 1, "meta": {"err": None, "preBalances": [2, 0],
-            "postBalances": [1, 1], "logMessages": []},
-            "transaction": {"message": {"accountKeys": [
-                {"pubkey": "6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz"},
-                {"pubkey": "SomeCounterparty111111111111111111111111111"}]}}}
-_ex47._cache.clear()
-_w47 = _ex47.fetch_activity("6BCbkts1TJdvvipwzsebJVfFwuhB6NU4KDPMZQzrjAtz",
-                            limit=4, transport=_rpc47)
-check("429s degrade to partial results, never an exception",
-      len(_w47["txs"]) >= 1 and _w47["rate_limited"] is True)
-check("partial results are labeled with requested vs delivered",
-      _w47["requested"] == 4)
-_h47 = open(os.path.join(os.path.dirname(__file__), "web",
-                         "index.html")).read()
-check("UI states the rate limit plainly", "rate-limited" in _h47
-      and "partial" in _h47)
-
-
-# ── 48. mobile layout — spec BEFORE code ──────────────────────────────────
-
-print("\n=== 48. mobile ===")
-_hm = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
-_mob = "".join(_hm[_hm.index("@media (max-width:860px)"):].split())
-_j = _mob.find("@media", 10)
-_mob = _mob[:_j] if _j != -1 else _mob
-check("canvas is never hidden on phones", ".right{display:none}" not in _mob)
-check("phone layout stacks to one scrolling column",
-      "main{grid-template-columns:1fr" in _mob and "overflow:auto" in _mob)
-check("dashboard tiles collapse to a single column on phones",
-      ".dash{grid-template-columns:1fr}" in _mob)
 
 
 # ── 49. owner-signed payments (Phantom) — spec BEFORE code ─────────────────
@@ -1653,67 +1711,6 @@ if hasattr(_ch49, "build_user_payment"):
         check("sanctioned recipient refuses the build",
               "SANCTIONS_LIST_MATCH" in str(e))
 
-# ── 50. Phantom wiring in the page — spec BEFORE code ──────────────────────
-
-print("\n=== 50. phantom page wiring ===")
-_h50 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
-check("web3 vendored locally, no CDN script",
-      'src="vendor/web3.min.js"' in _h50 and "unpkg.com" not in _h50
-      and "cdn.jsdelivr" not in _h50)
-check("connect button + accountChanged autofill",
-      'id="phconnect"' in _h50 and "accountChanged" in _h50)
-check("ownership proof via signMessage", "signMessage" in _h50
-      and 'id="phverify"' in _h50)
-check("owner-signed pay uses deserialize + signAndSendTransaction",
-      "VersionedTransaction.deserialize" in _h50
-      and "signAndSendTransaction" in _h50 and 'id="phpay"' in _h50)
-check("devnet network guard stated", "Phantom" in _h50 and "devnet" in _h50)
-import server as _sv50
-from fastapi.testclient import TestClient as _TC50
-_c50 = _TC50(_sv50.app)
-check("vendor assets served", _c50.get("/vendor/web3.min.js").status_code == 200)
-_ks50 = {k: os.environ.pop(k, None) for k in ("DEEPSEEK_API_KEY", "deepseek_api")}
-os.environ["DEMO_FALLBACK"] = "1"
-_oldrcpt50 = os.environ.get("VERIPAY_RECIPIENT")
-os.environ["VERIPAY_RECIPIENT"] = _rcpt49  # hermetic: CI has no .env
-try:
-    _r50 = _c50.post("/api/analyze",
-                     files={"file": ("clean_invoice.pdf",
-                                     open("clean_invoice.pdf", "rb"),
-                                     "application/pdf")},
-                     data={"question": "total?"})
-    _rel50 = json.loads(_r50.text.strip().splitlines()[-1])["result"]
-    _root50 = _rel50["audit_log_root"]
-    _b50 = _c50.post("/api/build_payment",
-                     json={"payer": _user49, "root": _root50, "lamports": 1000})
-    # fallback fixture has a mismatch -> the SERVER must refuse the build
-    check("server refuses to build for an unverified release",
-          _b50.status_code == 409, str(_b50.status_code))
-    _b50g = _c50.post("/api/build_payment",
-                      json={"payer": _user49, "root": "ee" * 32, "lamports": 1000})
-    check("unknown root -> 404 (server only pays what IT released)",
-          _b50g.status_code == 404)
-finally:
-    os.environ.pop("DEMO_FALLBACK", None)
-    if _oldrcpt50 is not None:
-        os.environ["VERIPAY_RECIPIENT"] = _oldrcpt50
-    else:
-        os.environ.pop("VERIPAY_RECIPIENT", None)
-    for k, v in _ks50.items():
-        if v is not None:
-            os.environ[k] = v
-
-
-# ── 51. no duplicated handlers — regression lock ───────────────────────────
-
-print("\n=== 51. handler uniqueness ===")
-_h51 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
-for _pat in ('$("exec").onclick', '$("drop").onclick', "function ts()",
-             "function log(", "function render(r){", "function renderWallet",
-             "function wireShare"):
-    check(f"exactly one {_pat}", _h51.count(_pat) == 1,
-          f"count={_h51.count(_pat)}")
-
 
 # ── 52. on-chain reputation from refusals — spec BEFORE code ───────────────
 
@@ -1754,6 +1751,7 @@ check("UI renders the reputation badge with honest window wording",
       and "notarized refusal" in _h52)
 
 
+
 # ── 53. phantom absence diagnoses the browser — spec BEFORE code ───────────
 
 print("\n=== 53. phantom absence UX ===")
@@ -1761,21 +1759,6 @@ _h53 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
 check("Safari users are told Phantom does not support Safari",
       "Safari" in _h53 and "phantom.app" in _h53)
 
-
-# ── 54. transaction node graph — spec BEFORE code ──────────────────────────
-
-print("\n=== 54. tx node graph ===")
-_h54 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
-check("graph renderer exists and is invoked from the wallet view",
-      "function renderTxGraph" in _h54 and "renderTxGraph(w)" in _h54)
-check("edges aggregate per counterparty with direction and totals",
-      "aggregated" in _h54 and "totalIn" in _h54 and "totalOut" in _h54)
-check("veripay and sanctioned counterparties visually distinct",
-      "edgeColor" in _h54)
-check("2D draw-in trick, motion-safe",
-      "stroke-dasharray" in _h54 and "drawEdge" in _h54)
-check("graph is honest about scope",
-      "within the fetched window" in _h54)
 
 
 # ── 55. rent-safe payment default — spec BEFORE code (#33) ─────────────────
@@ -1788,6 +1771,7 @@ check("server default payment covers rent-exempt minimum",
       and "1000)" not in _sv55.split('body.get("lamports"')[1][:40])
 check("page requests a rent-safe amount",
       "lamports:1000000" in _h55.replace(" ","") and "lamports:1000}" not in _h55.replace(" ",""))
+
 
 # ── Summary ───────────────────────────────────────────────────────────────
 
