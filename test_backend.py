@@ -1282,6 +1282,20 @@ for _hid in ("prep", "verifyjson", "exec"):
             _ok = True
     check(f"{_hid} handler sits in an executed inline script", _ok)
 
+
+# ── 44. no duplicate top-level declarations in the page script ─────────────
+
+print("\n=== 44. script parses once ===")
+import re as _re44
+from collections import Counter as _C44
+_h44 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+_code44 = "\n".join(m.group(2) for m in _re44.finditer(
+    r'<script\b([^>]*)>(.*?)</script>', _h44, _re44.S) if "src=" not in m.group(1))
+_top44 = _re44.findall(r"^(?:let|const)\s+([A-Za-z_$][\w$]*)", _code44, _re44.M)
+_dup44 = sorted(n for n, c in _C44(_top44).items() if c > 1)
+check("no top-level let/const declared twice (kills the whole script)",
+      not _dup44, ",".join(_dup44[:6]))
+
 # ── 20. chain layer — verification-gated payments, written BEFORE the code ─
 
 print("\n=== 20. chain (Solana devnet, offline fake transport) ===")
@@ -1376,6 +1390,7 @@ if _has_ch:
 
 
 
+
 # ── 22. contribution card — real address, real QR, no fabrications ─────────
 # Written BEFORE the implementation.
 
@@ -1423,6 +1438,7 @@ try:
 except Exception as _e:
     print(f"  FAIL contribution spec crashed: {_e}")
     FAIL += 1
+
 
 
 
@@ -1524,6 +1540,7 @@ except Exception as _e23:
 
 
 
+
 # ── 26. wallet audit (paste-any-address, read-only) — spec BEFORE code ─────
 
 print("\n=== 26. wallet audit ===")
@@ -1580,6 +1597,7 @@ if _has_ex:
     _page = _c4.get("/").text
     check("frontend carries the wallet audit section",
           "WALLET_AUDIT" in _page)
+
 
 
 
@@ -1666,6 +1684,7 @@ if _has_sc:
 
 
 
+
 # ── 29. refusal notarization — spec BEFORE code ────────────────────────────
 
 print("\n=== 29. refusal notarization ===")
@@ -1703,6 +1722,7 @@ if hasattr(_ch3, "notarize_refusal"):
 
 
 
+
 # ── 30. refusal notarization wired into the live proof (#15) — spec first ──
 
 print("\n=== 30. devnet_live refusal wiring ===")
@@ -1712,6 +1732,7 @@ check("live proof notarizes the refusal", "notarize_refusal" in _dl)
 check("refusal leg prints its own explorer line", "REFUSAL-NOTARIZED" in _dl)
 check("refusal notarization happens on the REFUSED path, before the paid leg",
       _dl.index("notarize_refusal") < _dl.index("pay_if_verified(clean"))
+
 
 
 
@@ -1765,6 +1786,7 @@ check("no root -> memo stays in the original format", ":log:" not in _memor2)
 
 
 
+
 # ── 40. left-rail tabs — spec BEFORE code ──────────────────────────────────
 
 print("\n=== 40. left-rail tabs ===")
@@ -1778,6 +1800,7 @@ check("wallet markers survive the retheme",
       and "counterparty_sanctioned" in _h40
       and "no public sanctions reports found" in _h40.lower()
       and "CONTRIBUTION_PROTOCOL" in _h40 and "COPY_ADDRESS" in _h40)
+
 
 
 
@@ -1813,6 +1836,7 @@ except ValueError:
 
 
 
+
 # ── 44. canvas scroll + counterparty sanity — spec BEFORE code ─────────────
 
 print("\n=== 44. scroll + counterparty ===")
@@ -1836,6 +1860,7 @@ _w44 = _ex44.fetch_activity("GsfWthK4iREYpDWbhEHmEpXRjg1wfi6vsoxNFy4EbqTd",
 check("program ids are never shown as the counterparty",
       _w44["txs"][0]["counterparty"] == "RealCounterparty1111111111111111111111111111",
       _w44["txs"][0]["counterparty"])
+
 
 
 
@@ -1893,6 +1918,7 @@ if hasattr(_ch49, "build_user_payment"):
 
 
 
+
 # ── 52. on-chain reputation from refusals — spec BEFORE code ───────────────
 
 print("\n=== 52. reputation ===")
@@ -1938,12 +1964,14 @@ check("UI renders the reputation badge with honest window wording",
 
 
 
+
 # ── 53. phantom absence diagnoses the browser — spec BEFORE code ───────────
 
 print("\n=== 53. phantom absence UX ===")
 _h53 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
 check("Safari users are told Phantom does not support Safari",
       "Safari" in _h53 and "phantom.app" in _h53)
+
 
 
 
@@ -1962,6 +1990,7 @@ check("server default payment covers rent-exempt minimum",
       and "1000)" not in _sv55.split('body.get("lamports"')[1][:40])
 check("page requests a rent-safe amount",
       "lamports:1000000" in _h55.replace(" ","") and "lamports:1000}" not in _h55.replace(" ",""))
+
 
 
 
