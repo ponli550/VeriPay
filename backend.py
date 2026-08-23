@@ -1215,6 +1215,49 @@ def build_insights(facts: list, checks: list, risks: list,
     return "\n".join(lines)
 
 
+def verify_external(raw: dict, redacted: list, question: str = "") -> dict:
+    """Use-your-AI-app mode: the user extracted with THEIR model (any app,
+    any subscription); this runs the identical deterministic pipeline on
+    the pasted JSON — cleaning, arithmetic, citation pinning, charts,
+    patterns, insights. The model was never trusted in the automated path
+    either, so verification is provider-blind by construction."""
+    result = _empty_result()
+    result["provider"] = "external"
+    result["redaction_count"] = 0
+    result["redacted_preview"] = "\n\n".join(
+        f"--- {label} ---\n{text}" for label, text in redacted)[:2000]
+    if not isinstance(raw, dict):
+        result["error"] = "pasted content is not a JSON object"
+        return result
+    result["answer"] = str(raw.get("answer", "")).strip()
+    result["recommendation"] = str(raw.get("recommendation", "")).strip()
+    result["facts"] = _clean_facts(raw.get("facts"))
+    result["risks"] = _clean_risks(raw.get("risks"), result["facts"])
+    result["checks"] = verify(result["facts"], raw.get("checks"))
+    for f in result["facts"]:
+        f["verified_in_source"] = _fact_in_source(f, redacted)
+    result["charts"] = _clean_charts(raw.get("charts"), result["facts"])
+    result["patterns"] = verify_patterns(result["facts"], raw.get("patterns"))
+    checks = result["checks"]
+    result["summary"] = {
+        "facts_extracted": len(result["facts"]),
+        "checks_run": len(checks),
+        "checks_passed": sum(1 for c in checks if c.get("passed")),
+        "checks_failed": sum(
+            1 for c in checks if not c.get("passed") and not c.get("error")),
+    }
+    result["insights"] = build_insights(
+        result["facts"], result["checks"], result["risks"],
+        result["summary"], result["patterns"])
+    return result
+
+
+def build_external_prompt(redacted: list, question: str) -> str:
+    """The exact text a user pastes into their own AI app."""
+    doc = "\n\n".join(f"--- {label} ---\n{text}" for label, text in redacted)
+    return f"{SYSTEM_PROMPT}\n\nDOCUMENT:\n{doc}\n\nQUESTION: {question}"
+
+
 def analyze(file_path: str, question: str,
             provider: str | None = None,
             api_key: str | None = None) -> dict:
