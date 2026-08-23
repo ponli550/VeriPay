@@ -183,6 +183,7 @@ h2.caps{color:var(--ink-faint);font-size:11px}
       <div style="display:flex;gap:8px;margin-bottom:6px">
         <button class="exec" id="prep" style="margin-bottom:0;background:none;border:1px solid var(--info);color:var(--info)">PREPARE + COPY PROMPT</button>
       </div>
+      <textarea class="q" id="promptbox" rows="4" placeholder="the redacted prompt appears here — select and copy it into your AI app" style="margin-bottom:6px;display:none;font-size:10px"></textarea>
       <textarea class="q" id="pastejson" rows="3" placeholder="then paste your AI's JSON reply here" style="margin-bottom:6px"></textarea>
       <button class="exec" id="verifyjson" style="background:none;border:1px solid var(--teal);color:var(--teal)">VERIFY PASTED JSON</button>
       <div class="mono" style="font-size:10px;color:var(--ink-faint);margin:6px 0 8px">redaction runs here first — your app only ever sees the scrubbed text; we verify whatever it answers</div>
@@ -289,11 +290,20 @@ $("prep").onclick=async()=>{
   if(!file){$("prep").textContent="STAGE A FILE FIRST";setTimeout(()=>$("prep").textContent="PREPARE + COPY PROMPT",2000);return;}
   const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
   const r=await fetch("/api/prepare",{method:"POST",body:fd});
-  if(!r.ok){log("system","fail",await r.text());return;}
+  if(!r.ok){log("prepare","fail",await r.text());return;}
   const j=await r.json();prepId=j.prep_id;
-  try{await navigator.clipboard.writeText(j.prompt);}catch(e){}
-  log("prepare","ok",`${j.redaction_count} PII item(s) masked · prompt copied — paste it into YOUR AI app`);
-  $("prep").textContent="PROMPT COPIED ✓";setTimeout(()=>$("prep").textContent="PREPARE + COPY PROMPT",3000);
+  // Always surface the prompt: the clipboard API is blocked on insecure
+  // origins, in some browsers, and without user-gesture trust — the
+  // textarea is the path that always works.
+  const box=$("promptbox");box.style.display="";box.value=j.prompt;
+  box.focus();box.select();
+  let copied=false;
+  try{await navigator.clipboard.writeText(j.prompt);copied=true;}catch(e){}
+  if(!copied){try{copied=document.execCommand("copy");}catch(e){}}
+  log("prepare","ok",`${j.redaction_count} PII item(s) masked · ${j.prompt.length} chars ready`
+      +(copied?" · copied to clipboard":" · clipboard blocked — the box above is selected, press Cmd/Ctrl+C"));
+  $("prep").textContent=copied?"PROMPT COPIED ✓":"SELECT AND COPY ABOVE ↑";
+  setTimeout(()=>$("prep").textContent="PREPARE + COPY PROMPT",5000);
 };
 $("verifyjson").onclick=async()=>{
   if(!prepId){log("system","fail","prepare the document first");return;}

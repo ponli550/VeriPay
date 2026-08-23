@@ -1223,6 +1223,20 @@ check("UI: prepare/copy-prompt/paste-back controls",
       'id="prep"' in _h39 and 'id="pastejson"' in _h39
       and "COPY PROMPT" in _h39 and "paste" in _h39.lower())
 
+
+# ── 40. prepare must never claim a copy it didn't make — spec BEFORE code ──
+
+print("\n=== 40. prepare copy honesty ===")
+_h40 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
+_blk = _h40[_h40.index('$("prep").onclick'):_h40.index('$("verifyjson").onclick')]
+check("the prompt is always shown for manual copy, clipboard or not",
+      "promptbox" in _blk and "select()" in _blk)
+check("clipboard success is verified, not assumed",
+      "copied=true" in _blk.replace(" ", "") or "copied = true" in _blk)
+check("failure says so instead of claiming success",
+      "select and copy" in _blk.lower() or "copy it manually" in _blk.lower())
+check("a prompt textarea exists in the markup", 'id="promptbox"' in _h40)
+
 # ── 20. chain layer — verification-gated payments, written BEFORE the code ─
 
 print("\n=== 20. chain (Solana devnet, offline fake transport) ===")
@@ -1313,6 +1327,7 @@ if _has_ch:
 
 
 
+
 # ── 22. contribution card — real address, real QR, no fabrications ─────────
 # Written BEFORE the implementation.
 
@@ -1360,6 +1375,7 @@ try:
 except Exception as _e:
     print(f"  FAIL contribution spec crashed: {_e}")
     FAIL += 1
+
 
 
 
@@ -1453,6 +1469,7 @@ except Exception as _e23:
 
 
 
+
 # ── 26. wallet audit (paste-any-address, read-only) — spec BEFORE code ─────
 
 print("\n=== 26. wallet audit ===")
@@ -1509,6 +1526,7 @@ if _has_ex:
     _page = _c4.get("/").text
     check("frontend carries the wallet audit section",
           "WALLET_AUDIT" in _page)
+
 
 
 
@@ -1587,6 +1605,7 @@ if _has_sc:
 
 
 
+
 # ── 29. refusal notarization — spec BEFORE code ────────────────────────────
 
 print("\n=== 29. refusal notarization ===")
@@ -1620,6 +1639,7 @@ if hasattr(_ch3, "notarize_refusal"):
 
 
 
+
 # ── 30. refusal notarization wired into the live proof (#15) — spec first ──
 
 print("\n=== 30. devnet_live refusal wiring ===")
@@ -1629,6 +1649,7 @@ check("live proof notarizes the refusal", "notarize_refusal" in _dl)
 check("refusal leg prints its own explorer line", "REFUSAL-NOTARIZED" in _dl)
 check("refusal notarization happens on the REFUSED path, before the paid leg",
       _dl.index("notarize_refusal") < _dl.index("pay_if_verified(clean"))
+
 
 
 
@@ -1674,6 +1695,7 @@ check("no root -> memo stays in the original format", ":log:" not in _memor2)
 
 
 
+
 # ── 40. left-rail tabs — spec BEFORE code ──────────────────────────────────
 
 print("\n=== 40. left-rail tabs ===")
@@ -1687,6 +1709,7 @@ check("wallet markers survive the retheme",
       and "counterparty_sanctioned" in _h40
       and "no public sanctions reports found" in _h40.lower()
       and "CONTRIBUTION_PROTOCOL" in _h40 and "COPY_ADDRESS" in _h40)
+
 
 
 
@@ -1714,6 +1737,7 @@ except ValueError:
 
 
 
+
 # ── 44. canvas scroll + counterparty sanity — spec BEFORE code ─────────────
 
 print("\n=== 44. scroll + counterparty ===")
@@ -1737,6 +1761,7 @@ _w44 = _ex44.fetch_activity("GsfWthK4iREYpDWbhEHmEpXRjg1wfi6vsoxNFy4EbqTd",
 check("program ids are never shown as the counterparty",
       _w44["txs"][0]["counterparty"] == "RealCounterparty1111111111111111111111111111",
       _w44["txs"][0]["counterparty"])
+
 
 
 
@@ -1786,6 +1811,7 @@ if hasattr(_ch49, "build_user_payment"):
 
 
 
+
 # ── 52. on-chain reputation from refusals — spec BEFORE code ───────────────
 
 print("\n=== 52. reputation ===")
@@ -1827,12 +1853,14 @@ check("UI renders the reputation badge with honest window wording",
 
 
 
+
 # ── 53. phantom absence diagnoses the browser — spec BEFORE code ───────────
 
 print("\n=== 53. phantom absence UX ===")
 _h53 = open(os.path.join(os.path.dirname(__file__), "web", "index.html")).read()
 check("Safari users are told Phantom does not support Safari",
       "Safari" in _h53 and "phantom.app" in _h53)
+
 
 
 
@@ -1847,6 +1875,7 @@ check("server default payment covers rent-exempt minimum",
       and "1000)" not in _sv55.split('body.get("lamports"')[1][:40])
 check("page requests a rent-safe amount",
       "lamports:1000000" in _h55.replace(" ","") and "lamports:1000}" not in _h55.replace(" ",""))
+
 
 
 
