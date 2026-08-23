@@ -233,98 +233,7 @@ h2.caps{color:var(--ink-faint);font-size:11px}
     </div>
   </div>
 </main>
-<script src="vendor/web3.min.js">
-// ── Phantom: connect / events / ownership proof / owner-signed pay ─────────
-let phWallet=null;
-const provider=()=>window.phantom?.solana?.isPhantom?window.phantom.solana:null;
-function phSet(addr){
-  phWallet=addr;
-  $("phstatus").textContent=addr?`connected: ${addr.slice(0,4)}…${addr.slice(-4)} · devnet required for payments`:"not connected · owner-signed payments need Phantom set to devnet";
-  $("phverify").style.display=addr?"":"none";
-  if(addr){$("waddr").value=addr;}
-  const pay=$("phpay");if(pay)pay.style.display=(addr&&lastResult&&lastResult.audit_log_root&&lastResult.summary&&lastResult.summary.checks_failed===0&&!lastResult.fallback_used)?"":"none";
-}
-$("phconnect").onclick=async()=>{
-  const p=provider();
-  if(!p){
-    const safari=/^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
-    $("phstatus").textContent=safari
-      ?"Phantom does not support Safari — open this page in Chrome, Brave or Firefox with the Phantom extension (phantom.app), set to devnet"
-      :"Phantom not detected — install the extension from phantom.app, reload, and set it to devnet";
-    return;}
-  try{
-    if(phWallet){await p.disconnect();phSet(null);$("phconnect").textContent="CONNECT PHANTOM";return;}
-    const res=await p.connect();
-    phSet(res.publicKey.toString());
-    $("phconnect").textContent="DISCONNECT";
-    p.on("accountChanged",pk=>{phSet(pk?pk.toString():null);if(phWallet)$("wgo").click();});
-    p.on("disconnect",()=>phSet(null));
-  }catch(e){$("phstatus").textContent="connect rejected";}
-};
-$("phverify").onclick=async()=>{
-  const p=provider();if(!p||!phWallet)return;
-  const nonce=`veripay ownership proof ${Date.now()} ${phWallet.slice(0,8)}`;
-  try{
-    const {signature}=await p.signMessage(new TextEncoder().encode(nonce),"utf8");
-    $("phstatus").textContent=`ownership signed ✓ sig ${btoa(String.fromCharCode(...signature.slice(0,9)))}… (signMessage)`;
-  }catch(e){$("phstatus").textContent="signMessage rejected";}
-};
-async function phPay(){
-  const p=provider();if(!p||!phWallet||!lastResult)return;
-  const out=$("phpayout");
-  out.textContent="building gated transaction…";
-  const r=await fetch("/api/build_payment",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({payer:phWallet,root:lastResult.audit_log_root,lamports:1000000})});
-  if(!r.ok){out.textContent=`refused: ${await r.text()}`;return;}
-  const j=await r.json();
-  try{
-    const bytes=Uint8Array.from(atob(j.tx),c=>c.charCodeAt(0));
-    const vtx=solanaWeb3.VersionedTransaction.deserialize(bytes);
-    const {signature}=await p.signAndSendTransaction(vtx);
-    out.innerHTML=`paid by YOUR wallet — <a target="_blank" style="color:var(--teal)" href="https://explorer.solana.com/tx/${signature}?cluster=devnet">${signature.slice(0,18)}… ↗</a>`;
-  }catch(e){out.textContent=`Phantom: ${e.message||e} (is Phantom on devnet?)`;}
-}
-// ── Use-your-AI-app mode: prepare (redact-only) -> copy prompt ->
-// paste the app's JSON back -> identical deterministic verification.
-let prepId=null;
-$("prep").onclick=async()=>{
-  const out=$("prepout");
-  if(!file){out.style.color="var(--amber)";out.textContent="stage a PDF or XLSX first";return;}
-  out.style.color="var(--ink-faint)";out.textContent="preparing — redacting locally…";
-  const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
-  let r;
-  try{r=await fetch("/api/prepare",{method:"POST",body:fd});}
-  catch(e){out.style.color="var(--orange)";out.textContent="network error: "+e.message;return;}
-  if(!r.ok){const t=await r.text();out.style.color="var(--orange)";out.textContent="failed: "+t.slice(0,90);log("prepare","fail",t);return;}
-  const j=await r.json();prepId=j.prep_id;
-  const box=$("promptbox");box.style.display="";box.value=j.prompt;
-  // Feedback where the eye is: the aside can be hidden on narrow
-  // screens and the button label is transient, so the inline line
-  // persists and the box is scrolled into view.
-  box.scrollIntoView({block:"nearest"});box.focus();box.select();
-  let copied=false;
-  try{await navigator.clipboard.writeText(j.prompt);copied=true;}catch(e){}
-  if(!copied){try{copied=document.execCommand("copy");}catch(e){}}
-  out.style.color=copied?"var(--teal)":"var(--amber)";
-  out.textContent=`${j.redaction_count} PII masked · ${j.prompt.length} chars ready · `
-    +(copied?"copied to clipboard — paste into your AI app":"clipboard blocked — the box below is selected, press Cmd/Ctrl+C");
-  log("prepare","ok",`${j.redaction_count} PII item(s) masked · ${j.prompt.length} chars ready`
-      +(copied?" · copied to clipboard":" · clipboard blocked, prompt shown for manual copy"));
-  $("prep").textContent=copied?"PROMPT COPIED ✓":"SELECT AND COPY BELOW ↓";
-};
-$("verifyjson").onclick=async()=>{
-  if(!prepId){log("system","fail","prepare the document first");return;}
-  const r=await fetch("/api/verify_json",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({prep_id:prepId,llm_json:$("pastejson").value})});
-  if(!r.ok){log("system","fail",await r.text());return;}
-  const res=await r.json();
-  lastResult=res;lastEvents=[];
-  render(res);
-  $("srcflag").textContent="SOURCE: YOUR APP — verified here";
-  $("srcflag").style.color="var(--info)";
-  $("shareboard").style.display="";$("shareboard").onclick=shareBoard;
-};
-</script>
+<script src="vendor/web3.min.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -882,6 +791,97 @@ async function phPay(){
     out.innerHTML=`paid by YOUR wallet — <a target="_blank" style="color:var(--teal)" href="https://explorer.solana.com/tx/${signature}?cluster=devnet">${signature.slice(0,18)}… ↗</a>`;
   }catch(e){out.textContent=`Phantom: ${e.message||e} (is Phantom on devnet?)`;}
 }
+
+// ── Phantom: connect / events / ownership proof / owner-signed pay ─────────
+let phWallet=null;
+const provider=()=>window.phantom?.solana?.isPhantom?window.phantom.solana:null;
+function phSet(addr){
+  phWallet=addr;
+  $("phstatus").textContent=addr?`connected: ${addr.slice(0,4)}…${addr.slice(-4)} · devnet required for payments`:"not connected · owner-signed payments need Phantom set to devnet";
+  $("phverify").style.display=addr?"":"none";
+  if(addr){$("waddr").value=addr;}
+  const pay=$("phpay");if(pay)pay.style.display=(addr&&lastResult&&lastResult.audit_log_root&&lastResult.summary&&lastResult.summary.checks_failed===0&&!lastResult.fallback_used)?"":"none";
+}
+$("phconnect").onclick=async()=>{
+  const p=provider();
+  if(!p){
+    const safari=/^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+    $("phstatus").textContent=safari
+      ?"Phantom does not support Safari — open this page in Chrome, Brave or Firefox with the Phantom extension (phantom.app), set to devnet"
+      :"Phantom not detected — install the extension from phantom.app, reload, and set it to devnet";
+    return;}
+  try{
+    if(phWallet){await p.disconnect();phSet(null);$("phconnect").textContent="CONNECT PHANTOM";return;}
+    const res=await p.connect();
+    phSet(res.publicKey.toString());
+    $("phconnect").textContent="DISCONNECT";
+    p.on("accountChanged",pk=>{phSet(pk?pk.toString():null);if(phWallet)$("wgo").click();});
+    p.on("disconnect",()=>phSet(null));
+  }catch(e){$("phstatus").textContent="connect rejected";}
+};
+$("phverify").onclick=async()=>{
+  const p=provider();if(!p||!phWallet)return;
+  const nonce=`veripay ownership proof ${Date.now()} ${phWallet.slice(0,8)}`;
+  try{
+    const {signature}=await p.signMessage(new TextEncoder().encode(nonce),"utf8");
+    $("phstatus").textContent=`ownership signed ✓ sig ${btoa(String.fromCharCode(...signature.slice(0,9)))}… (signMessage)`;
+  }catch(e){$("phstatus").textContent="signMessage rejected";}
+};
+async function phPay(){
+  const p=provider();if(!p||!phWallet||!lastResult)return;
+  const out=$("phpayout");
+  out.textContent="building gated transaction…";
+  const r=await fetch("/api/build_payment",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({payer:phWallet,root:lastResult.audit_log_root,lamports:1000000})});
+  if(!r.ok){out.textContent=`refused: ${await r.text()}`;return;}
+  const j=await r.json();
+  try{
+    const bytes=Uint8Array.from(atob(j.tx),c=>c.charCodeAt(0));
+    const vtx=solanaWeb3.VersionedTransaction.deserialize(bytes);
+    const {signature}=await p.signAndSendTransaction(vtx);
+    out.innerHTML=`paid by YOUR wallet — <a target="_blank" style="color:var(--teal)" href="https://explorer.solana.com/tx/${signature}?cluster=devnet">${signature.slice(0,18)}… ↗</a>`;
+  }catch(e){out.textContent=`Phantom: ${e.message||e} (is Phantom on devnet?)`;}
+}
+// ── Use-your-AI-app mode: prepare (redact-only) -> copy prompt ->
+// paste the app's JSON back -> identical deterministic verification.
+let prepId=null;
+$("prep").onclick=async()=>{
+  const out=$("prepout");
+  if(!file){out.style.color="var(--amber)";out.textContent="stage a PDF or XLSX first";return;}
+  out.style.color="var(--ink-faint)";out.textContent="preparing — redacting locally…";
+  const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
+  let r;
+  try{r=await fetch("/api/prepare",{method:"POST",body:fd});}
+  catch(e){out.style.color="var(--orange)";out.textContent="network error: "+e.message;return;}
+  if(!r.ok){const t=await r.text();out.style.color="var(--orange)";out.textContent="failed: "+t.slice(0,90);log("prepare","fail",t);return;}
+  const j=await r.json();prepId=j.prep_id;
+  const box=$("promptbox");box.style.display="";box.value=j.prompt;
+  // Feedback where the eye is: the aside can be hidden on narrow
+  // screens and the button label is transient, so the inline line
+  // persists and the box is scrolled into view.
+  box.scrollIntoView({block:"nearest"});box.focus();box.select();
+  let copied=false;
+  try{await navigator.clipboard.writeText(j.prompt);copied=true;}catch(e){}
+  if(!copied){try{copied=document.execCommand("copy");}catch(e){}}
+  out.style.color=copied?"var(--teal)":"var(--amber)";
+  out.textContent=`${j.redaction_count} PII masked · ${j.prompt.length} chars ready · `
+    +(copied?"copied to clipboard — paste into your AI app":"clipboard blocked — the box below is selected, press Cmd/Ctrl+C");
+  log("prepare","ok",`${j.redaction_count} PII item(s) masked · ${j.prompt.length} chars ready`
+      +(copied?" · copied to clipboard":" · clipboard blocked, prompt shown for manual copy"));
+  $("prep").textContent=copied?"PROMPT COPIED ✓":"SELECT AND COPY BELOW ↓";
+};
+$("verifyjson").onclick=async()=>{
+  if(!prepId){log("system","fail","prepare the document first");return;}
+  const r=await fetch("/api/verify_json",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prep_id:prepId,llm_json:$("pastejson").value})});
+  if(!r.ok){log("system","fail",await r.text());return;}
+  const res=await r.json();
+  lastResult=res;lastEvents=[];
+  render(res);
+  $("srcflag").textContent="SOURCE: YOUR APP — verified here";
+  $("srcflag").style.color="var(--info)";
+  $("shareboard").style.display="";$("shareboard").onclick=shareBoard;
+};
 </script>
 </body>
 </html>
