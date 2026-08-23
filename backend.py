@@ -22,6 +22,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.2")
 
 
 # ── Step 1: File parsing (PDF + XLSX) ─────────────────────────────────────
@@ -98,7 +101,7 @@ PHONE_RE = re.compile(r"\b(?:\+?60|0)1\d[-\s]?\d{3,4}[-\s]?\d{4}\b")
 
 # Name detection, layered (regex alone cannot catch names — say this
 # limitation out loud in the pitch; it reads as honest, not weak):
-#   1. KNOWN_NAMES        — hand-listed names for the demo document
+#   1. KNOWN_NAMES        — extra names supplied at runtime (see below)
 #   2. PDF /Author        — pulled from metadata per-run (see analyze)
 #   3. "Prepared by" cues — signature-block lines name the preparer
 #   4. Honorific + name   — Datuk/Dato'/Tan Sri/Encik/Puan/Mr/Dr...
@@ -106,8 +109,15 @@ PHONE_RE = re.compile(r"\b(?:\+?60|0)1\d[-\s]?\d{3,4}[-\s]?\d{4}\b")
 #                            which cover ALL-CAPS signature blocks
 # Residual gap: a bare Chinese or Western name with no title, cue, or
 # patronymic (e.g. "LIM CHEE KEONG" alone on a line) is NOT caught.
+#
+# KNOWN_NAMES is EMPTY by default — no personal name is baked into the
+# source. The demo preparer ("Prepared by Ahmad Bin Ali") is already
+# caught by the cue and patronymic layers, so no hardcode is needed. If a
+# deployment needs to force-scrub specific names, set FINVERIFY_KNOWN_NAMES
+# to a comma-separated list; it is read at import time only.
 KNOWN_NAMES: list[str] = [
-    "Ahmad Bin Ali",
+    n.strip() for n in os.environ.get("FINVERIFY_KNOWN_NAMES", "").split(",")
+    if n.strip()
 ]
 
 _NAME_WORD = r"[A-Z][\w'.@-]*"
@@ -275,7 +285,66 @@ def _extract_json(raw: str) -> dict:
         raise
 
 
-def _call_deepseek(pages: list[tuple[str, str]], question: str) -> dict:
+def _openai_style(base_url: str, model: str, api_key: str,
+                  pages: list[tuple[str, str]], question: str) -> dict:
+    """Shared path for OpenAI-compatible chat endpoints (DeepSeek, Google's
+    official Gemini compatibility endpoint, OpenAI itself)."""
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=45)
+    doc = "\n\n".join(f"--- {label} ---\n{text}" for label, text in pages)
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"DOCUMENT:\n{doc}\n\nQUESTION: {question}"},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.0,
+    )
+    return _extract_json(resp.choices[0].message.content)
+
+
+def _call_gemini(pages, question, api_key=None):
+    key = api_key or os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is not set — supply your own key "
+                           "(aistudio.google.com) in the Connect-your-AI field.")
+    return _openai_style(
+        "https://generativelanguage.googleapis.com/v1beta/openai/",
+        GEMINI_MODEL, key, pages, question)
+
+
+def _call_openai(pages, question, api_key=None):
+    key = api_key or os.environ.get("OPENAI_API_KEY", "")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY is not set — supply your own key "
+                           "(platform.openai.com) in the Connect-your-AI field.")
+    return _openai_style("https://api.openai.com/v1", OPENAI_MODEL, key,
+                         pages, question)
+
+
+def _call_claude(pages, question, api_key=None):
+    """Official anthropic SDK — never an OpenAI-compat shim for Claude."""
+    import anthropic
+    key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set — supply your own "
+                           "key (console.anthropic.com) in the Connect-your-AI field.")
+    client = anthropic.Anthropic(api_key=key, timeout=60.0)
+    doc = "\n\n".join(f"--- {label} ---\n{text}" for label, text in pages)
+    response = client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=16000,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user",
+                   "content": f"DOCUMENT:\n{doc}\n\nQUESTION: {question}"}],
+    )
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    return _extract_json(text)
+
+
+def _call_deepseek(pages: list[tuple[str, str]], question: str,
+                   api_key: str | None = None) -> dict:
     """Raw call to DeepSeek (OpenAI-compatible API). Raises on ANY
     failure: missing dependency, missing API key, network error, or
     unparsable output. Deliberately has no fallback logic of its own —
@@ -288,7 +357,8 @@ def _call_deepseek(pages: list[tuple[str, str]], question: str) -> dict:
 
     # DEEPSEEK_API_KEY is canonical; `deepseek_api` accepted so an
     # existing .env keeps working without edits.
-    api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("deepseek_api")
+    api_key = (api_key or os.environ.get("DEEPSEEK_API_KEY")
+               or os.environ.get("deepseek_api"))
     if not api_key:
         raise RuntimeError(
             "DEEPSEEK_API_KEY is not set. Get a key at platform.deepseek.com "
@@ -309,6 +379,26 @@ def _call_deepseek(pages: list[tuple[str, str]], question: str) -> dict:
     return _extract_json(resp.choices[0].message.content)
 
 
+# BYOK registry: user-supplied keys ride one request and are never
+# stored or logged — retention = request, same as the uploads.
+PROVIDERS = {
+    "deepseek": lambda p, q, k=None: _call_deepseek(p, q, k),
+    "gemini":   lambda p, q, k=None: _call_gemini(p, q, k),
+    "claude":   lambda p, q, k=None: _call_claude(p, q, k),
+    "openai":   lambda p, q, k=None: _call_openai(p, q, k),
+}
+
+
+def _dispatch(provider, pages, question, api_key):
+    impl = PROVIDERS.get(provider)
+    if impl is None:
+        raise RuntimeError(
+            f"unknown provider: {provider} — supported: {sorted(PROVIDERS)}")
+    if api_key is None and provider == "deepseek":
+        return _call_deepseek(pages, question)   # env-key path, test-compatible
+    return impl(pages, question, api_key)
+
+
 def _load_cached_response() -> dict:
     """Load the demo-safety cached response used when DEMO_FALLBACK=1."""
     path = os.path.join(os.path.dirname(__file__), "fixtures", "cached_response.json")
@@ -319,7 +409,9 @@ def _load_cached_response() -> dict:
         return json.load(fh)
 
 
-def ask_llm(pages: list[tuple[str, str]], question: str) -> tuple[dict, bool]:
+def ask_llm(pages: list[tuple[str, str]], question: str,
+            provider: str | None = None,
+            api_key: str | None = None) -> tuple[dict, bool]:
     """Send redacted document to DeepSeek. Returns (parsed JSON dict, cached).
 
     `cached` is True only when the DEMO_FALLBACK substitution fired — the
@@ -335,15 +427,19 @@ def ask_llm(pages: list[tuple[str, str]], question: str) -> tuple[dict, bool]:
     during normal development so real failures still look like real
     failures.
     """
+    provider = (provider or os.environ.get("LLM_PROVIDER") or "deepseek").lower()
+    if provider not in PROVIDERS:
+        raise RuntimeError(
+            f"unknown provider: {provider} — supported: {sorted(PROVIDERS)}")
     try:
-        return _call_deepseek(pages, question), False
+        return _dispatch(provider, pages, question, api_key), False
     except Exception:
         # One bounded retry with jitter: hotspot blips and transient 5xx
         # are common; a second attempt is cheap. Anything past that is a
         # real outage and belongs to the fallback/raise path.
         time.sleep(random.uniform(0.3, 0.9))
         try:
-            return _call_deepseek(pages, question), False
+            return _dispatch(provider, pages, question, api_key), False
         except Exception as e:
             if os.environ.get("DEMO_FALLBACK") == "1":
                 return _load_cached_response(), True
@@ -705,15 +801,20 @@ PIPELINE_STAGES = ["parse", "redact", "extract",
                    "analyse-patterns", "release"]
 
 
-def analyze_stream(file_path: str, question: str):
+def analyze_stream(file_path: str, question: str,
+                   provider: str | None = None,
+                   api_key: str | None = None):
     """Chained public face of the pipeline: every event the user watches
     is hash-chained and HMAC-signed (see verify_audit_chain), so the
     telemetry itself is tamper-evident — the PDPA story, enforced rather
     than labeled."""
-    yield from _chain_events(_analyze_events(file_path, question))
+    yield from _chain_events(_analyze_events(file_path, question,
+                                         provider, api_key))
 
 
-def _analyze_events(file_path: str, question: str):
+def _analyze_events(file_path: str, question: str,
+                    provider: str | None = None,
+                    api_key: str | None = None):
     """In-product CI: the pipeline the user watches. Yields one event per
     stage transition — {"stage", "status": running|ok|fail|skip,
     "detail", "elapsed_ms", "result"} — and releases the result only in
@@ -791,7 +892,11 @@ def _analyze_events(file_path: str, question: str):
         yield ev
         t0 = _time.perf_counter()
         try:
-            raw, cached = ask_llm(redacted, question.strip())
+            _prov = (provider or os.environ.get("LLM_PROVIDER")
+                     or "deepseek").lower()
+            result["provider"] = _prov
+            raw, cached = ask_llm(redacted, question.strip(),
+                                  provider=_prov, api_key=api_key)
             result["fallback_used"] = cached
             if not isinstance(raw, dict):
                 result["error"] = "Model returned an unexpected shape."
@@ -803,7 +908,8 @@ def _analyze_events(file_path: str, question: str):
             yield {"stage": "extract", "status": "fail",
                    "detail": result["error"], "elapsed_ms": ms, "result": None}
         else:
-            src_label = "CACHED fixture" if result["fallback_used"] else "LIVE model call"
+            src_label = ("CACHED fixture" if result["fallback_used"]
+                         else f"LIVE {result.get('provider', 'model')} call")
             n_facts = len(raw.get("facts") or [])
             yield {"stage": "extract", "status": "ok",
                    "detail": f"{n_facts} fact(s) via {src_label}",
@@ -918,6 +1024,7 @@ def _empty_result() -> dict:
         "redaction_count": 0,
         "redacted_preview": "",
         "fallback_used": False,
+        "provider": "",
         "summary": {"facts_extracted": 0, "checks_run": 0,
                     "checks_passed": 0, "checks_failed": 0},
         "error": None,
@@ -1108,11 +1215,14 @@ def build_insights(facts: list, checks: list, risks: list,
     return "\n".join(lines)
 
 
-def analyze(file_path: str, question: str) -> dict:
+def analyze(file_path: str, question: str,
+            provider: str | None = None,
+            api_key: str | None = None) -> dict:
     """Full pipeline. Never raises — errors come back in the 'error' field.
     Thin consumer of analyze_stream(): one code path, two presentations."""
     result = None
-    for event in analyze_stream(file_path, question):
+    for event in analyze_stream(file_path, question,
+                                provider=provider, api_key=api_key):
         if event["stage"] == "release":
             result = event["result"]
     return result
