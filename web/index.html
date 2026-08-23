@@ -183,6 +183,7 @@ h2.caps{color:var(--ink-faint);font-size:11px}
       <div style="display:flex;gap:8px;margin-bottom:6px">
         <button class="exec" id="prep" style="margin-bottom:0;background:none;border:1px solid var(--info);color:var(--info)">PREPARE + COPY PROMPT</button>
       </div>
+      <div class="mono" id="prepout" style="font-size:10px;color:var(--teal);margin-bottom:6px"></div>
       <textarea class="q" id="promptbox" rows="4" placeholder="the redacted prompt appears here — select and copy it into your AI app" style="margin-bottom:6px;display:none;font-size:10px"></textarea>
       <textarea class="q" id="pastejson" rows="3" placeholder="then paste your AI's JSON reply here" style="margin-bottom:6px"></textarea>
       <button class="exec" id="verifyjson" style="background:none;border:1px solid var(--teal);color:var(--teal)">VERIFY PASTED JSON</button>
@@ -287,23 +288,29 @@ async function phPay(){
 // paste the app's JSON back -> identical deterministic verification.
 let prepId=null;
 $("prep").onclick=async()=>{
-  if(!file){$("prep").textContent="STAGE A FILE FIRST";setTimeout(()=>$("prep").textContent="PREPARE + COPY PROMPT",2000);return;}
+  const out=$("prepout");
+  if(!file){out.style.color="var(--amber)";out.textContent="stage a PDF or XLSX first";return;}
+  out.style.color="var(--ink-faint)";out.textContent="preparing — redacting locally…";
   const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
-  const r=await fetch("/api/prepare",{method:"POST",body:fd});
-  if(!r.ok){log("prepare","fail",await r.text());return;}
+  let r;
+  try{r=await fetch("/api/prepare",{method:"POST",body:fd});}
+  catch(e){out.style.color="var(--orange)";out.textContent="network error: "+e.message;return;}
+  if(!r.ok){const t=await r.text();out.style.color="var(--orange)";out.textContent="failed: "+t.slice(0,90);log("prepare","fail",t);return;}
   const j=await r.json();prepId=j.prep_id;
-  // Always surface the prompt: the clipboard API is blocked on insecure
-  // origins, in some browsers, and without user-gesture trust — the
-  // textarea is the path that always works.
   const box=$("promptbox");box.style.display="";box.value=j.prompt;
-  box.focus();box.select();
+  // Feedback where the eye is: the aside can be hidden on narrow
+  // screens and the button label is transient, so the inline line
+  // persists and the box is scrolled into view.
+  box.scrollIntoView({block:"nearest"});box.focus();box.select();
   let copied=false;
   try{await navigator.clipboard.writeText(j.prompt);copied=true;}catch(e){}
   if(!copied){try{copied=document.execCommand("copy");}catch(e){}}
+  out.style.color=copied?"var(--teal)":"var(--amber)";
+  out.textContent=`${j.redaction_count} PII masked · ${j.prompt.length} chars ready · `
+    +(copied?"copied to clipboard — paste into your AI app":"clipboard blocked — the box below is selected, press Cmd/Ctrl+C");
   log("prepare","ok",`${j.redaction_count} PII item(s) masked · ${j.prompt.length} chars ready`
-      +(copied?" · copied to clipboard":" · clipboard blocked — the box above is selected, press Cmd/Ctrl+C"));
-  $("prep").textContent=copied?"PROMPT COPIED ✓":"SELECT AND COPY ABOVE ↑";
-  setTimeout(()=>$("prep").textContent="PREPARE + COPY PROMPT",5000);
+      +(copied?" · copied to clipboard":" · clipboard blocked, prompt shown for manual copy"));
+  $("prep").textContent=copied?"PROMPT COPIED ✓":"SELECT AND COPY BELOW ↓";
 };
 $("verifyjson").onclick=async()=>{
   if(!prepId){log("system","fail","prepare the document first");return;}
