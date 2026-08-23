@@ -34,7 +34,16 @@ _WEB = os.path.join(os.path.dirname(__file__), "web", "index.html")
 
 @app.get("/")
 def index():
-    return FileResponse(_WEB, media_type="text/html")
+    # The whole app is one HTML file whose JS changes every deploy — a
+    # cached copy runs stale handlers against a current server, which
+    # looks exactly like "the button does nothing". FileResponse would
+    # attach etag/last-modified and let a browser revalidate into a 304,
+    # so send the bytes directly, uncacheable.
+    with open(_WEB, encoding="utf-8") as fh:
+        return Response(fh.read(), media_type="text/html", headers={
+            "Cache-Control": "no-store, must-revalidate",
+            "Pragma": "no-cache",
+        })
 
 
 @app.get("/api/contribution")
