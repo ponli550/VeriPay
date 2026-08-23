@@ -129,6 +129,64 @@ async def build_payment(request: Request):
     return {"tx": tx, "recipient": recipient, "lamports": lamports}
 
 
+_prepared: dict = {}
+
+
+@app.post("/api/prepare")
+async def prepare(file: UploadFile, question: str = Form(...)):
+    """Use-your-AI-app mode, step 1: parse + redact ONLY — no model call.
+    Returns the copyable prompt; the redacted pages are held in-process
+    (ephemeral, LRU 20) so the paste-back step can pin citations."""
+    import hashlib
+    suffix = os.path.splitext(file.filename or "")[1].lower() or ".pdf"
+    fd, path = tempfile.mkstemp(prefix="finverify_", suffix=suffix)
+    with os.fdopen(fd, "wb") as out:
+        out.write(await file.read())
+    try:
+        pages = backend.parse_file(path)
+        if not pages:
+            return Response("no text found in the document", status_code=400)
+        extra = (backend.pdf_metadata_names(path)
+                 if path.lower().endswith(".pdf") else [])
+        redacted, total = [], 0
+        for label, text in pages:
+            clean, n = backend.redact(text, extra)
+            redacted.append((label, clean))
+            total += n
+    except Exception as e:
+        return Response(f"could not read that file: {e}", status_code=400)
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    prompt = backend.build_external_prompt(redacted, question.strip())
+    prep_id = hashlib.sha256(prompt.encode()).hexdigest()[:24]
+    _prepared[prep_id] = redacted
+    while len(_prepared) > 20:
+        _prepared.pop(next(iter(_prepared)))
+    return {"prep_id": prep_id, "prompt": prompt, "redaction_count": total}
+
+
+@app.post("/api/verify_json")
+async def verify_json(request: Request):
+    """Step 2: the user pastes their app's JSON back; the identical
+    deterministic pipeline verifies it."""
+    body = await request.json()
+    prep_id = str(body.get("prep_id", ""))
+    redacted = _prepared.get(prep_id)
+    if redacted is None:
+        return Response("unknown prep id — prepare the document on this "
+                        "server first (preparations are ephemeral)",
+                        status_code=404)
+    try:
+        raw = backend._extract_json(str(body.get("llm_json", "")))
+    except Exception:
+        return Response("that is not parseable JSON — paste your AI's "
+                        "complete JSON reply", status_code=400)
+    return backend.verify_external(raw, redacted)
+
+
 @app.post("/api/analyze")
 async def analyze(file: UploadFile, question: str = Form(...),
                   provider: str = Form(""), api_key: str = Form("")):

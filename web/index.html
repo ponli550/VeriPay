@@ -179,6 +179,13 @@ h2.caps{color:var(--ink-faint);font-size:11px}
       <div class="mono" style="font-size:10px;color:var(--ink-faint);margin-bottom:8px">your key is never stored or logged — it is used once and discarded with the request</div>
       <input class="q" id="q" value="What was total revenue, and does it add up?">
       <button class="exec" id="exec" disabled>▶ EXECUTE PIPELINE</button>
+      <div class="caps" style="color:var(--ink-faint);margin:8px 0 6px">Or use your AI app — no key at all</div>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <button class="exec" id="prep" style="margin-bottom:0;background:none;border:1px solid var(--info);color:var(--info)">PREPARE + COPY PROMPT</button>
+      </div>
+      <textarea class="q" id="pastejson" rows="3" placeholder="then paste your AI's JSON reply here" style="margin-bottom:6px"></textarea>
+      <button class="exec" id="verifyjson" style="background:none;border:1px solid var(--teal);color:var(--teal)">VERIFY PASTED JSON</button>
+      <div class="mono" style="font-size:10px;color:var(--ink-faint);margin:6px 0 8px">redaction runs here first — your app only ever sees the scrubbed text; we verify whatever it answers</div>
       <p class="privacy"><b>PII is redacted locally before any text reaches the model</b> — only
       redacted text is sent, never the file. The upload exists on disk only for the duration of
       the analysis and is deleted the moment the pipeline completes. Known limits: bare names
@@ -275,6 +282,31 @@ async function phPay(){
     out.innerHTML=`paid by YOUR wallet — <a target="_blank" style="color:var(--teal)" href="https://explorer.solana.com/tx/${signature}?cluster=devnet">${signature.slice(0,18)}… ↗</a>`;
   }catch(e){out.textContent=`Phantom: ${e.message||e} (is Phantom on devnet?)`;}
 }
+// ── Use-your-AI-app mode: prepare (redact-only) -> copy prompt ->
+// paste the app's JSON back -> identical deterministic verification.
+let prepId=null;
+$("prep").onclick=async()=>{
+  if(!file){$("prep").textContent="STAGE A FILE FIRST";setTimeout(()=>$("prep").textContent="PREPARE + COPY PROMPT",2000);return;}
+  const fd=new FormData();fd.append("file",file);fd.append("question",$("q").value);
+  const r=await fetch("/api/prepare",{method:"POST",body:fd});
+  if(!r.ok){log("system","fail",await r.text());return;}
+  const j=await r.json();prepId=j.prep_id;
+  try{await navigator.clipboard.writeText(j.prompt);}catch(e){}
+  log("prepare","ok",`${j.redaction_count} PII item(s) masked · prompt copied — paste it into YOUR AI app`);
+  $("prep").textContent="PROMPT COPIED ✓";setTimeout(()=>$("prep").textContent="PREPARE + COPY PROMPT",3000);
+};
+$("verifyjson").onclick=async()=>{
+  if(!prepId){log("system","fail","prepare the document first");return;}
+  const r=await fetch("/api/verify_json",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prep_id:prepId,llm_json:$("pastejson").value})});
+  if(!r.ok){log("system","fail",await r.text());return;}
+  const res=await r.json();
+  lastResult=res;lastEvents=[];
+  render(res);
+  $("srcflag").textContent="SOURCE: YOUR APP — verified here";
+  $("srcflag").style.color="var(--info)";
+  $("shareboard").style.display="";$("shareboard").onclick=shareBoard;
+};
 </script>
 <script>
 const $=id=>document.getElementById(id);
